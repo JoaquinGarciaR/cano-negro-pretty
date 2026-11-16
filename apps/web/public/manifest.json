@@ -1,0 +1,17 @@
+{
+  "name": "Caño Negro Pretty - Salón de Belleza",
+  "short_name": "Pretty",
+  "description": "Sistema de gestión y agenda para Caño Negro Pretty",
+  "start_url": "/admin",
+  "display": "standalone",
+  "background_color": "#FFFDF9",
+  "theme_color": "#4A0E17",
+  "icons": [
+    {
+      "src": "/icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
+}

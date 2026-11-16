@@ -1,0 +1,21 @@
+{
+  "name": "cano-negro-pretty-monorepo",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Sistema de reservas y backoffice PWA para Caño Negro Pretty",
+  "scripts": {
+    "dev:api": "pnpm --filter @cano/api dev",
+    "dev:web": "pnpm --filter @cano/web dev",
+    "build:shared": "pnpm --filter @cano/shared build",
+    "build": "pnpm -r build",
+    "db:migrate": "pnpm --filter @cano/api prisma migrate dev",
+    "db:push": "pnpm --filter @cano/api prisma db push",
+    "db:generate": "pnpm --filter @cano/api prisma generate",
+    "db:seed": "pnpm --filter @cano/api seed",
+    "db:studio": "pnpm --filter @cano/api prisma studio"
+  },
+  "devDependencies": {
+    "concurrently": "^8.2.2",
+    "typescript": "^5.3.3"
+  }
+}

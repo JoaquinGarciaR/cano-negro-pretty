@@ -1,0 +1,487 @@
+import { prisma } from '../prisma';
+import { BookingStatus, Modality, Prisma } from '@prisma/client';
+import {
+  CreateBookingInput,
+  CreateManualBookingInput,
+  UpdateBookingStatusInput,
+  normalizePhone
+} from '@cano/shared';
+import { sendPushToSalon, sendPushToUser } from './push';
+
+function generateReferenceCode(): string {
+  const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+  let result = 'CNP-';
+  for (let i = 0; i < 4; i++) {
+    result += chars.charAt(Math.floor(Math.random() * chars.length));
+  }
+  return result;
+}
+
+export async function createBooking(input: CreateBookingInput) {
+  const {
+    clientName,
+    clientPhone,
+    countryCode = '+506',
+    modality,
+    locationId,
+    customAddress,
+    professionalId,
+    serviceId,
+    packageId,
+    startTime: startTimeISO,
+    clientNotes
+  } = input;
+
+  const fullPhone = normalizePhone(clientPhone, countryCode);
+
+  const business = await prisma.business.findFirst({
+    where: { id: 'cano_negro_pretty_main' }
+  });
+  if (!business) {
+    throw new Error('Negocio no encontrado');
+  }
+
+  // 1. Obtener precios y duraciones del servicio o paquete
+  let serviceName = '';
+  let durationMinutes = 60;
+  let priceBaseCRC = 0;
+
+  if (serviceId) {
+    const service = await prisma.service.findUnique({
+      where: { id: serviceId }
+    });
+    if (!service || !service.active) {
+      throw new Error('El servicio seleccionado no está activo o no existe');
+    }
+    serviceName = service.name;
+    durationMinutes = service.durationBlocks * 15;
+    priceBaseCRC = service.priceCRC;
+  } else if (packageId) {
+    const pkg = await prisma.package.findUnique({
+      where: { id: packageId },
+      include: {
+        components: {
+          include: { service: true }
+        }
+      }
+    });
+    if (!pkg || !pkg.active) {
+      throw new Error('El paquete seleccionado no está activo o no existe');
+    }
+    serviceName = pkg.name;
+    durationMinutes = pkg.totalDurationBlocks * 15;
+    const componentsSum = pkg.components.reduce((sum, c) => sum + c.service.priceCRC, 0);
+    priceBaseCRC = componentsSum + pkg.extraPriceCRC;
+  }
+
+  // 2. Calcular tarifa de traslado y descuento por localidad en servicio a domicilio
+  let locationFeeCRC = 0;
+  let discountCRC = 0;
+  let locationDiscountId: string | null = null;
+
+  if (modality === 'HOME_VISIT' && locationId) {
+    const location = await prisma.locationDiscount.findUnique({
+      where: { id: locationId }
+    });
+    if (location && location.active) {
+      locationFeeCRC = location.priceCRC || 0;
+      discountCRC = location.discountCRC || 0;
+      locationDiscountId = location.id;
+    }
+  }
+
+  const totalCRC = Math.max(0, priceBaseCRC + locationFeeCRC - discountCRC);
+
+  const startTime = new Date(startTimeISO);
+  if (startTime.getTime() <= Date.now()) {
+    throw new Error('No es posible reservar en fechas u horas pasadas');
+  }
+  const endTime = new Date(startTime.getTime() + durationMinutes * 60000);
+
+  // 3. Crear reserva con código de referencia único
+  let referenceCode = generateReferenceCode();
+  let codeExists = await prisma.booking.findUnique({ where: { referenceCode } });
+  while (codeExists) {
+    referenceCode = generateReferenceCode();
+    codeExists = await prisma.booking.findUnique({ where: { referenceCode } });
+  }
+
+  const booking = await prisma.booking.create({
+    data: {
+      referenceCode,
+      businessId: business.id,
+      clientName,
+      clientPhone: fullPhone,
+      modality: modality as Modality,
+      locationDiscountId,
+      customAddress: modality === 'HOME_VISIT' ? customAddress : null,
+      professionalId: professionalId || null,
+      serviceId: serviceId || null,
+      packageId: packageId || null,
+      snapshotServiceName: serviceName,
+      snapshotDurationMinutes: durationMinutes,
+      snapshotPriceCRC: priceBaseCRC,
+      snapshotLocationFeeCRC: locationFeeCRC,
+      snapshotDiscountCRC: discountCRC,
+      snapshotTotalCRC: totalCRC,
+      startTime,
+      endTime,
+      status: BookingStatus.PENDING,
+      clientNotes: clientNotes || null
+    },
+    include: {
+      professional: true,
+      locationDiscount: true
+    }
+  });
+
+  // 4. Notificación interna (a la esteticista seleccionada o a todas en la bandeja compartida)
+  await prisma.notification.create({
+    data: {
+      businessId: business.id,
+      professionalId: professionalId || null,
+      title: professionalId ? 'Nueva solicitud de cita' : 'Nueva solicitud sin asignar (Bandeja compartida)',
+      message: `${clientName} ha solicitado ${serviceName} para el ${startTime.toLocaleString('es-CR')}.`,
+      bookingId: booking.id
+    }
+  });
+
+  // 5. Emitir Web Push a los dispositivos suscritos de las esteticistas
+  sendPushToSalon(business.id, {
+    title: professionalId ? 'Nueva Cita Asignada' : 'Nueva Solicitud Entrante',
+    body: `${clientName} ha solicitado ${serviceName}. Revisa tu bandeja de solicitudes.`,
+    url: '/admin'
+  }).catch((e) => console.warn('Error al emitir web push al salón:', e));
+
+  return booking;
+}
+
+/**
+ * Creación manual de cita por personal/administración
+ */
+export async function createManualBooking(input: CreateManualBookingInput, createdByUserId?: string) {
+  const {
+    clientName,
+    clientPhone,
+    countryCode = '+506',
+    modality,
+    locationId,
+    customAddress,
+    professionalId,
+    serviceId,
+    packageId,
+    startTime: startTimeISO,
+    clientNotes,
+    staffNotes
+  } = input;
+
+  const fullPhone = normalizePhone(clientPhone, countryCode);
+
+  const business = await prisma.business.findFirst({
+    where: { id: 'cano_negro_pretty_main' }
+  });
+  if (!business) {
+    throw new Error('Negocio no encontrado');
+  }
+
+  let serviceName = '';
+  let durationMinutes = 60;
+  let priceBaseCRC = 0;
+
+  if (serviceId) {
+    const service = await prisma.service.findUnique({ where: { id: serviceId } });
+    if (!service) throw new Error('Servicio no encontrado');
+    serviceName = service.name;
+    durationMinutes = service.durationBlocks * 15;
+    priceBaseCRC = service.priceCRC;
+  } else if (packageId) {
+    const pkg = await prisma.package.findUnique({
+      where: { id: packageId },
+      include: { components: { include: { service: true } } }
+    });
+    if (!pkg) throw new Error('Paquete no encontrado');
+    serviceName = pkg.name;
+    durationMinutes = pkg.totalDurationBlocks * 15;
+    const sum = pkg.components.reduce((acc, c) => acc + c.service.priceCRC, 0);
+    priceBaseCRC = sum + pkg.extraPriceCRC;
+  }
+
+  let locationFeeCRC = 0;
+  let discountCRC = 0;
+  let locationDiscountId: string | null = null;
+  if (modality === 'HOME_VISIT' && locationId) {
+    const loc = await prisma.locationDiscount.findUnique({ where: { id: locationId } });
+    if (loc && loc.active) {
+      locationFeeCRC = loc.priceCRC || 0;
+      discountCRC = loc.discountCRC || 0;
+      locationDiscountId = loc.id;
+    }
+  }
+
+  const totalCRC = Math.max(0, priceBaseCRC + locationFeeCRC - discountCRC);
+  const startTime = new Date(startTimeISO);
+  const endTime = new Date(startTime.getTime() + durationMinutes * 60000);
+
+  // Verificación atómica de espacio libre
+  return await prisma.$transaction(async (tx) => {
+    const bufferMinutes = modality === 'HOME_VISIT' ? business.homeVisitBufferMinutes : 0;
+    const windowStart = new Date(startTime.getTime() - bufferMinutes * 60000);
+    const windowEnd = new Date(endTime.getTime() + bufferMinutes * 60000);
+
+    const conflicting = await tx.booking.findFirst({
+      where: {
+        professionalId,
+        status: BookingStatus.CONFIRMED,
+        startTime: { lt: windowEnd },
+        endTime: { gt: windowStart }
+      }
+    });
+
+    if (conflicting) {
+      const err: any = new Error(
+        `Conflicto: La esteticista ya tiene la cita #${conflicting.referenceCode} confirmada en ese intervalo.`
+      );
+      err.code = 'CONFLICT';
+      throw err;
+    }
+
+    const conflictingBlock = await tx.timeBlock.findFirst({
+      where: {
+        professionalId,
+        startTime: { lt: windowEnd },
+        endTime: { gt: windowStart }
+      }
+    });
+
+    if (conflictingBlock) {
+      const err: any = new Error(
+        `Conflicto: La esteticista tiene un bloqueo de horario (${conflictingBlock.title}) en ese intervalo.`
+      );
+      err.code = 'CONFLICT';
+      throw err;
+    }
+
+    let referenceCode = generateReferenceCode();
+    let codeExists = await tx.booking.findUnique({ where: { referenceCode } });
+    while (codeExists) {
+      referenceCode = generateReferenceCode();
+      codeExists = await tx.booking.findUnique({ where: { referenceCode } });
+    }
+
+    const booking = await tx.booking.create({
+      data: {
+        referenceCode,
+        businessId: business.id,
+        clientName,
+        clientPhone: fullPhone,
+        modality: modality as Modality,
+        locationDiscountId,
+        customAddress: modality === 'HOME_VISIT' ? customAddress : null,
+        professionalId,
+        serviceId: serviceId || null,
+        packageId: packageId || null,
+        snapshotServiceName: serviceName,
+        snapshotDurationMinutes: durationMinutes,
+        snapshotPriceCRC: priceBaseCRC,
+        snapshotLocationFeeCRC: locationFeeCRC,
+        snapshotDiscountCRC: discountCRC,
+        snapshotTotalCRC: totalCRC,
+        startTime,
+        endTime,
+        status: BookingStatus.CONFIRMED,
+        clientNotes: clientNotes || null,
+        staffNotes: staffNotes || 'Cita ingresada manualmente por personal'
+      },
+      include: {
+        professional: true,
+        locationDiscount: true
+      }
+    });
+
+    await tx.auditLog.create({
+      data: {
+        bookingId: booking.id,
+        userId: createdByUserId || null,
+        action: 'MANUAL_BOOKING_CREATED',
+        details: `Cita creada manualmente y asignada a ${booking.professional?.name}.`
+      }
+    });
+
+    await tx.notification.create({
+      data: {
+        businessId: business.id,
+        professionalId,
+        title: 'Cita asignada a tu agenda',
+        message: `Te han asignado la cita #${booking.referenceCode} para ${clientName}.`,
+        bookingId: booking.id
+      }
+    });
+
+    return booking;
+  });
+}
+
+/**
+ * Asignar una cita pendiente a un profesional
+ */
+export async function assignBooking(
+  bookingId: string,
+  professionalId: string,
+  assignedByUserId?: string,
+  staffNotes?: string
+) {
+  return await prisma.$transaction(async (tx) => {
+    const booking = await tx.booking.findUnique({
+      where: { id: bookingId },
+      include: {
+        business: true
+      }
+    });
+
+    if (!booking) {
+      throw new Error('Reserva no encontrada');
+    }
+
+    const bufferMinutes = booking.modality === Modality.HOME_VISIT
+      ? booking.business.homeVisitBufferMinutes
+      : 0;
+
+    const windowStart = new Date(booking.startTime.getTime() - bufferMinutes * 60000);
+    const windowEnd = new Date(booking.endTime.getTime() + bufferMinutes * 60000);
+
+    const conflicting = await tx.booking.findFirst({
+      where: {
+        id: { not: booking.id },
+        professionalId,
+        status: BookingStatus.CONFIRMED,
+        startTime: { lt: windowEnd },
+        endTime: { gt: windowStart }
+      }
+    });
+
+    if (conflicting) {
+      const err: any = new Error(
+        `Conflicto de horario: La profesional ya tiene la cita #${conflicting.referenceCode} confirmada en este intervalo.`
+      );
+      err.code = 'CONFLICT';
+      throw err;
+    }
+
+    const updated = await tx.booking.update({
+      where: { id: bookingId },
+      data: {
+        professionalId,
+        status: BookingStatus.CONFIRMED,
+        staffNotes: staffNotes || booking.staffNotes
+      },
+      include: {
+        professional: true,
+        locationDiscount: true
+      }
+    });
+
+    await tx.auditLog.create({
+      data: {
+        bookingId: booking.id,
+        userId: assignedByUserId || null,
+        action: `ASSIGNED_TO_${professionalId}`,
+        details: `Cita asignada a ${updated.professional?.name} y confirmada.`
+      }
+    });
+
+    await tx.notification.create({
+      data: {
+        businessId: booking.businessId,
+        professionalId,
+        title: 'Nueva cita asignada a tu agenda',
+        message: `Se te ha asignado la cita #${booking.referenceCode} con ${booking.clientName} (${booking.snapshotServiceName}).`,
+        bookingId: booking.id
+      }
+    });
+
+    return updated;
+  });
+}
+
+/**
+ * Confirmación atómica y actualización de estados con control de concurrencia
+ */
+export async function updateBookingStatus(
+  bookingId: string,
+  input: UpdateBookingStatusInput,
+  userId?: string
+) {
+  const { status, staffNotes, professionalId } = input;
+
+  return await prisma.$transaction(async (tx) => {
+    const booking = await tx.booking.findUnique({
+      where: { id: bookingId },
+      include: {
+        business: true,
+        professional: true
+      }
+    });
+
+    if (!booking) {
+      throw new Error('Reserva no encontrada');
+    }
+
+    const targetProfId = professionalId || booking.professionalId;
+
+    if (status === BookingStatus.CONFIRMED) {
+      if (!targetProfId) {
+        throw new Error('Para confirmar la cita debe asignar una esteticista responsable');
+      }
+
+      const bufferMinutes = booking.modality === Modality.HOME_VISIT
+        ? booking.business.homeVisitBufferMinutes
+        : 0;
+
+      const windowStart = new Date(booking.startTime.getTime() - bufferMinutes * 60000);
+      const windowEnd = new Date(booking.endTime.getTime() + bufferMinutes * 60000);
+
+      const conflictingBooking = await tx.booking.findFirst({
+        where: {
+          id: { not: booking.id },
+          professionalId: targetProfId,
+          status: BookingStatus.CONFIRMED,
+          startTime: { lt: windowEnd },
+          endTime: { gt: windowStart }
+        }
+      });
+
+      if (conflictingBooking) {
+        const error: any = new Error(
+          `Conflicto de horario: Ya existe otra cita confirmada (#${conflictingBooking.referenceCode}) para esta esteticista en el intervalo solicitado.`
+        );
+        error.code = 'CONFLICT';
+        error.conflictingBooking = conflictingBooking;
+        throw error;
+      }
+    }
+
+    const updated = await tx.booking.update({
+      where: { id: bookingId },
+      data: {
+        status: status as BookingStatus,
+        professionalId: targetProfId,
+        staffNotes: staffNotes !== undefined ? staffNotes : booking.staffNotes
+      },
+      include: {
+        professional: true,
+        locationDiscount: true
+      }
+    });
+
+    await tx.auditLog.create({
+      data: {
+        bookingId: booking.id,
+        userId: userId || null,
+        action: `STATUS_CHANGE_TO_${status}`,
+        details: staffNotes ? `Nota de personal: ${staffNotes}` : `Estado actualizado a ${status}`
+      }
+    });
+
+    return updated;
+  });
+}

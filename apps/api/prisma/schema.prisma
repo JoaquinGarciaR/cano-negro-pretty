@@ -1,0 +1,264 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum UserRole {
+  OWNER
+  STAFF
+}
+
+enum Modality {
+  AT_STATION
+  HOME_VISIT
+}
+
+enum BookingStatus {
+  PENDING
+  CONFIRMED
+  REJECTED
+  CANCELLED
+  COMPLETED
+}
+
+model Business {
+  id                      String             @id @default(uuid())
+  name                    String             @default("Caño Negro Pretty")
+  currency                String             @default("CRC")
+  timezone                String             @default("America/Costa_Rica")
+  homeVisitBufferMinutes  Int                @default(30)
+  stationBufferMinutes    Int                @default(15)
+  createdAt               DateTime           @default(now())
+  updatedAt               DateTime           @updatedAt
+
+  users                   User[]
+  professionals           Professional[]
+  services                Service[]
+  packages                Package[]
+  locationDiscounts       LocationDiscount[]
+  bookings                Booking[]
+  notifications           Notification[]
+}
+
+model User {
+  id                String             @id @default(uuid())
+  email             String             @unique
+  passwordHash      String
+  name              String
+  role              UserRole           @default(STAFF)
+  businessId        String
+  business          Business           @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  professionalId    String?            @unique
+  professional      Professional?      @relation(fields: [professionalId], references: [id], onDelete: SetNull)
+  createdAt         DateTime           @default(now())
+  updatedAt         DateTime           @updatedAt
+
+  auditLogs         AuditLog[]
+  pushSubscriptions PushSubscription[]
+}
+
+model Professional {
+  id            String                @id
+  businessId    String
+  business      Business              @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  name          String
+  bio           String?
+  avatarUrl     String?
+  active        Boolean               @default(true)
+  createdAt     DateTime              @default(now())
+  updatedAt     DateTime              @updatedAt
+
+  user              User?
+  services          ProfessionalService[]
+  schedules         Schedule[]
+  timeBlocks        TimeBlock[]
+  dayAvailabilities DayAvailability[]
+  bookings          Booking[]
+  notifications     Notification[]
+}
+
+model Service {
+  id                String                @id
+  businessId        String
+  business          Business              @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  name              String
+  category          String
+  description       String
+  imageUrl          String
+  priceCRC          Int
+  durationBlocks    Int                   // Bloques de 15 min
+  active            Boolean               @default(true)
+  createdAt         DateTime              @default(now())
+  updatedAt         DateTime              @updatedAt
+
+  professionals     ProfessionalService[]
+  packageComponents PackageService[]
+  bookings          Booking[]
+}
+
+model Package {
+  id                  String           @id
+  businessId          String
+  business            Business         @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  name                String
+  description         String
+  imageUrl            String?
+  extraPriceCRC       Int              @default(0)
+  totalDurationBlocks Int
+  active              Boolean          @default(true)
+  createdAt           DateTime         @default(now())
+  updatedAt           DateTime         @updatedAt
+
+  components          PackageService[]
+  bookings            Booking[]
+}
+
+model PackageService {
+  packageId String
+  package   Package @relation(fields: [packageId], references: [id], onDelete: Cascade)
+  serviceId String
+  service   Service @relation(fields: [serviceId], references: [id], onDelete: Cascade)
+
+  @@id([packageId, serviceId])
+}
+
+model ProfessionalService {
+  professionalId String
+  professional   Professional @relation(fields: [professionalId], references: [id], onDelete: Cascade)
+  serviceId      String
+  service        Service      @relation(fields: [serviceId], references: [id], onDelete: Cascade)
+
+  @@id([professionalId, serviceId])
+}
+
+model Schedule {
+  id             String       @id @default(uuid())
+  professionalId String
+  professional   Professional @relation(fields: [professionalId], references: [id], onDelete: Cascade)
+  dayOfWeek      Int          // 0 = Domingo, 1 = Lunes, ..., 6 = Sábado
+  startTime      String       // "08:00"
+  endTime        String       // "17:00"
+  isWorkingDay   Boolean      @default(true)
+
+  @@unique([professionalId, dayOfWeek])
+}
+
+model DayAvailability {
+  id             String       @id @default(uuid())
+  professionalId String
+  professional   Professional @relation(fields: [professionalId], references: [id], onDelete: Cascade)
+  date           String       // YYYY-MM-DD en America/Costa_Rica
+  startTime      String       @default("08:00") // HH:mm local Costa Rica
+  endTime        String       @default("17:00") // HH:mm local Costa Rica
+  isOpen         Boolean      @default(true)    // Si está desbloqueado para recibir citas
+  customNote     String?      // e.g. "Jornada en Caño Negro centro"
+  createdAt      DateTime     @default(now())
+  updatedAt      DateTime     @updatedAt
+
+  @@unique([professionalId, date])
+  @@index([professionalId, date, isOpen])
+}
+
+model TimeBlock {
+  id             String       @id @default(uuid())
+  professionalId String
+  professional   Professional @relation(fields: [professionalId], references: [id], onDelete: Cascade)
+  title          String
+  startTime      DateTime     // UTC
+  endTime        DateTime     // UTC
+  isBreak        Boolean      @default(false)
+  createdAt      DateTime     @default(now())
+}
+
+model LocationDiscount {
+  id          String    @id @default(uuid())
+  businessId  String
+  business    Business  @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  name        String
+  priceCRC    Int       @default(0) // Precio / Tarifa adicional de traslado a domicilio
+  discountCRC Int       @default(0)
+  active      Boolean   @default(true)
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  bookings    Booking[]
+}
+
+model Booking {
+  id                      String            @id @default(uuid())
+  referenceCode           String            @unique
+  businessId              String
+  business                Business          @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  clientName              String
+  clientPhone             String
+  modality                Modality
+  locationDiscountId      String?
+  locationDiscount        LocationDiscount? @relation(fields: [locationDiscountId], references: [id], onDelete: SetNull)
+  customAddress           String?
+  professionalId          String?
+  professional            Professional?     @relation(fields: [professionalId], references: [id], onDelete: SetNull)
+  serviceId               String?
+  service                 Service?          @relation(fields: [serviceId], references: [id], onDelete: SetNull)
+  packageId               String?
+  package                 Package?          @relation(fields: [packageId], references: [id], onDelete: SetNull)
+
+  // Instantánea inmutable al momento de reservar
+  snapshotServiceName     String
+  snapshotDurationMinutes Int
+  snapshotPriceCRC        Int
+  snapshotDiscountCRC     Int
+  snapshotLocationFeeCRC  Int               @default(0) // Tarifa de traslado a domicilio aplicada
+  snapshotTotalCRC        Int
+
+  startTime               DateTime          // UTC
+  endTime                 DateTime          // UTC
+  status                  BookingStatus     @default(PENDING)
+  clientNotes             String?
+  staffNotes              String?
+
+  createdAt               DateTime          @default(now())
+  updatedAt               DateTime          @updatedAt
+
+  auditLogs               AuditLog[]
+
+  @@index([professionalId, startTime, endTime])
+  @@index([status])
+}
+
+model AuditLog {
+  id        String   @id @default(uuid())
+  bookingId String?
+  booking   Booking? @relation(fields: [bookingId], references: [id], onDelete: SetNull)
+  userId    String?
+  user      User?    @relation(fields: [userId], references: [id], onDelete: SetNull)
+  action    String
+  details   String?
+  createdAt DateTime @default(now())
+}
+
+model Notification {
+  id             String        @id @default(uuid())
+  businessId     String
+  business       Business      @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  professionalId String?
+  professional   Professional? @relation(fields: [professionalId], references: [id], onDelete: Cascade)
+  title          String
+  message        String
+  bookingId      String?
+  read           Boolean       @default(false)
+  createdAt      DateTime      @default(now())
+}
+
+model PushSubscription {
+  id        String   @id @default(uuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  endpoint  String   @unique
+  p256dh    String
+  auth      String
+  createdAt DateTime @default(now())
+}

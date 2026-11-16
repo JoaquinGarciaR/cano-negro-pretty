@@ -1,0 +1,116 @@
+{
+  "professionals": [
+    {
+      "id": "prof_elena",
+      "name": "Elena Mora",
+      "bio": "Especialista en manicura rusa, extensiones de uñas esculpidas y diseño de cejas.",
+      "avatarUrl": "https://images.unsplash.com/photo-1573496359142-b8d87734a5a2?auto=format&fit=crop&w=400&q=80",
+      "active": true
+    },
+    {
+      "id": "prof_sofia",
+      "name": "Sofía Vargas",
+      "bio": "Experta en lash lifting, volumen ruso y peinados para eventos y celebraciones.",
+      "avatarUrl": "https://images.unsplash.com/photo-1580489944761-15a19d654956?auto=format&fit=crop&w=400&q=80",
+      "active": true
+    }
+  ],
+  "locations": [
+    { "name": "San Antonio", "discountCRC": 0 },
+    { "name": "Caño Negro", "discountCRC": 0 },
+    { "name": "Precario", "discountCRC": 0 },
+    { "name": "Chompipera", "discountCRC": 0 },
+    { "name": "Nueva Esperanza", "discountCRC": 0 },
+    { "name": "Aguas Negras", "discountCRC": 0 }
+  ],
+  "services": [
+    {
+      "id": "srv_unas_semi",
+      "name": "Manicura Rusa & Semipermanente",
+      "category": "unas",
+      "description": "Limpieza profunda de cutículas con torno y esmaltado semipermanente de alta duración con acabado brillante.",
+      "imageUrl": "https://images.unsplash.com/photo-1604654894610-df63bc536371?auto=format&fit=crop&w=600&q=80",
+      "priceCRC": 12000,
+      "durationBlocks": 4,
+      "active": true,
+      "enabledProfessionals": ["prof_elena"]
+    },
+    {
+      "id": "srv_unas_acrilicas",
+      "name": "Uñas Acrílicas Esculpidas",
+      "category": "unas",
+      "description": "Extensión en técnica clásica o baby boomer con molde y diseño elegante a elección.",
+      "imageUrl": "https://images.unsplash.com/photo-1632345031435-8727f6897d53?auto=format&fit=crop&w=600&q=80",
+      "priceCRC": 20000,
+      "durationBlocks": 6,
+      "active": true,
+      "enabledProfessionals": ["prof_elena"]
+    },
+    {
+      "id": "srv_pestanas_clasicas",
+      "name": "Extensiones de Pestañas Clásicas 1x1",
+      "category": "pestanas",
+      "description": "Efecto natural pelo a pelo que realza la mirada con curvatura perfecta y máxima ligereza.",
+      "imageUrl": "https://images.unsplash.com/photo-1583001931096-959e9a1a6223?auto=format&fit=crop&w=600&q=80",
+      "priceCRC": 16000,
+      "durationBlocks": 6,
+      "active": true,
+      "enabledProfessionals": ["prof_elena", "prof_sofia"]
+    },
+    {
+      "id": "srv_pestanas_volumen",
+      "name": "Lash Lifting & Tinte Keratina",
+      "category": "pestanas",
+      "description": "Elevación y nutrición de tus pestañas naturales con tinte negro intenso y tratamiento hidratante.",
+      "imageUrl": "https://images.unsplash.com/photo-1522337360788-8b13dee7a37e?auto=format&fit=crop&w=600&q=80",
+      "priceCRC": 14000,
+      "durationBlocks": 3,
+      "active": true,
+      "enabledProfessionals": ["prof_sofia"]
+    },
+    {
+      "id": "srv_peinado_social",
+      "name": "Peinado Social & Ondas Glam",
+      "category": "peinados",
+      "description": "Ondas al agua o semi-recogido texturizado con fijación flexible y brillo sublime para eventos.",
+      "imageUrl": "https://images.unsplash.com/photo-1560066984-138dadb4c035?auto=format&fit=crop&w=600&q=80",
+      "priceCRC": 15000,
+      "durationBlocks": 4,
+      "active": true,
+      "enabledProfessionals": ["prof_sofia"]
+    },
+    {
+      "id": "srv_peinado_recogido",
+      "name": "Recogido Elegante de Fiesta",
+      "category": "peinados",
+      "description": "Recogido sofisticado alto o bajo, ideal para sesiones fotográficas, bodas o graduaciones.",
+      "imageUrl": "https://images.unsplash.com/photo-1519699047748-de8e457a634e?auto=format&fit=crop&w=600&q=80",
+      "priceCRC": 18000,
+      "durationBlocks": 5,
+      "active": true,
+      "enabledProfessionals": ["prof_sofia"]
+    }
+  ],
+  "packages": [
+    {
+      "id": "pkg_mirada_manos",
+      "name": "Combo Mirada & Manos Pretty",
+      "description": "Manicura Rusa Semipermanente + Lash Lifting con Tinte de Keratina. El dúo perfecto para sentirte radiante.",
+      "imageUrl": "https://images.unsplash.com/photo-1516975080664-ed2fc6a32937?auto=format&fit=crop&w=600&q=80",
+      "componentServiceIds": ["srv_unas_semi", "srv_pestanas_volumen"],
+      "extraPriceCRC": -2000,
+      "totalDurationBlocks": 6,
+      "active": true
+    },
+    {
+      "id": "pkg_glow_up_total",
+      "name": "Paquete Glow Up Total",
+      "description": "Manicura Semipermanente + Extensiones 1x1 + Peinado Social con Ondas Glam para un cambio deslumbrante.",
+      "imageUrl": "https://images.unsplash.com/photo-1487412720507-e7ab37603c6f?auto=format&fit=crop&w=600&q=80",
+      "componentServiceIds": ["srv_unas_semi", "srv_pestanas_clasicas", "srv_peinado_social"],
+      "extraPriceCRC": -5000,
+      "totalDurationBlocks": 12,
+      "active": true
+    }
+  ]
+}
