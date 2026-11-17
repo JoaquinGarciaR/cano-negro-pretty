@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo, useRef } from 'react';
 import {
   X,
   Calendar,
@@ -12,6 +12,11 @@ import {
   CalendarClock,
   Sparkles,
   ChevronRight,
+  ChevronDown,
+  Check,
+  Search,
+  UserCheck,
+  RefreshCw,
   Sun,
   Moon
 } from 'lucide-react';
@@ -30,7 +35,7 @@ export function RescheduleModal({
   isOpen,
   onClose,
   booking,
-  professionals,
+  professionals = [],
   token,
   onSuccess
 }: RescheduleModalProps) {
@@ -52,10 +57,44 @@ export function RescheduleModal({
   const [submitting, setSubmitting] = useState<boolean>(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
 
+  // Estado para el Dropdown interactivo de Esteticista
+  const [isProfDropdownOpen, setIsProfDropdownOpen] = useState<boolean>(false);
+  const [profSearchQuery, setProfSearchQuery] = useState<string>('');
+  const profDropdownRef = useRef<HTMLDivElement>(null);
+
+  // Manejo de clic exterior y tecla Escape para el dropdown de esteticista
+  useEffect(() => {
+    function handleClickOutside(e: MouseEvent | TouchEvent) {
+      if (profDropdownRef.current && !profDropdownRef.current.contains(e.target as Node)) {
+        setIsProfDropdownOpen(false);
+      }
+    }
+    function handleKeyDown(e: KeyboardEvent) {
+      if (e.key === 'Escape') {
+        setIsProfDropdownOpen(false);
+      }
+    }
+    if (isProfDropdownOpen) {
+      document.addEventListener('pointerdown', handleClickOutside);
+      document.addEventListener('keydown', handleKeyDown);
+    }
+    return () => {
+      document.removeEventListener('pointerdown', handleClickOutside);
+      document.removeEventListener('keydown', handleKeyDown);
+    };
+  }, [isProfDropdownOpen]);
+
+  // Esteticista actualmente asignada a la cita original
+  const currentBookingProfId = booking?.professionalId || booking?.professional?.id || null;
+  const currentBookingProf = useMemo(() => {
+    if (!currentBookingProfId) return null;
+    return professionals.find((p) => p.id === currentBookingProfId) || booking?.professional || null;
+  }, [currentBookingProfId, professionals, booking]);
+
   // Inicializar estado cuando se abre el modal con una cita
   useEffect(() => {
     if (booking && isOpen) {
-      const initialProf = booking.professionalId || booking.professional?.id || 'all';
+      const initialProf = currentBookingProfId || 'all';
       setSelectedProfId(initialProf);
 
       // Fecha inicial en formato YYYY-MM-DD
@@ -66,10 +105,12 @@ export function RescheduleModal({
       setUnavailableFeedback(null);
       setErrorMsg(null);
       setStaffNotes('');
+      setIsProfDropdownOpen(false);
+      setProfSearchQuery('');
 
       loadUnlockedDays(initialProf);
     }
-  }, [booking, isOpen]);
+  }, [booking, isOpen, currentBookingProfId]);
 
   // Cargar días abiertos según la profesional elegida
   async function loadUnlockedDays(profId: string) {
@@ -124,6 +165,41 @@ export function RescheduleModal({
       isMounted = false;
     };
   }, [isOpen, booking, selectedDate, selectedProfId]);
+
+  // Selección activa de esteticista formateada para el botón del dropdown
+  const selectedProfInfo = useMemo(() => {
+    if (selectedProfId === 'all') {
+      return {
+        title: 'Cualquier esteticista libre',
+        subtitle: 'Revisando disponibilidad general de todo el salón',
+        badge: 'Salón completo',
+        isCurrent: false,
+        isAll: true
+      };
+    }
+    const prof = professionals.find((p) => p.id === selectedProfId);
+    const isCurrent = currentBookingProfId && selectedProfId === currentBookingProfId;
+    return {
+      title: prof?.name || 'Esteticista seleccionada',
+      subtitle: isCurrent
+        ? 'Dejar la misma esteticista asignada'
+        : `Cambiar a ${prof?.name || 'otra esteticista'} (antes: ${currentBookingProf?.name || 'Sin asignar'})`,
+      badge: isCurrent ? 'Dejar la misma' : 'Cambiar esteticista',
+      isCurrent,
+      isAll: false,
+      photoUrl: prof?.photoUrl,
+      initials: prof?.name ? prof.name.slice(0, 2).toUpperCase() : 'ES'
+    };
+  }, [selectedProfId, currentBookingProfId, professionals, currentBookingProf]);
+
+  // Profesionales filtrados por la búsqueda dentro del dropdown
+  const filteredProfessionals = useMemo(() => {
+    if (!profSearchQuery.trim()) return professionals;
+    const q = profSearchQuery.toLowerCase().trim();
+    return professionals.filter(
+      (p) => p.name.toLowerCase().includes(q) || (p.title || '').toLowerCase().includes(q)
+    );
+  }, [professionals, profSearchQuery]);
 
   // Generar lista interactiva de días rápidos a partir de openDays o próximos 14 días
   const quickDays = useMemo(() => {
@@ -229,6 +305,13 @@ export function RescheduleModal({
     }
   }
 
+  function handleSelectProf(profId: string) {
+    setSelectedProfId(profId);
+    setIsProfDropdownOpen(false);
+    setProfSearchQuery('');
+    loadUnlockedDays(profId);
+  }
+
   function renderSlotButton(slot: any) {
     const isChosen = selectedSlot?.startTime === slot.startTime;
     const isAvailable = slot.available;
@@ -328,73 +411,264 @@ export function RescheduleModal({
           <div className="sm:text-right">
             <span className="text-[11px] text-pretty-wine-700/80 block">Esteticista asignada:</span>
             <span className="font-bold text-pretty-wine-900">
-              {booking.professional?.name || 'Sin asignar (Bandeja compartida)'}
+              {currentBookingProf?.name || 'Sin asignar (Bandeja compartida)'}
             </span>
           </div>
         </div>
 
-        {/* 1. Selector Interactivo de Esteticista (Pills) */}
-        <div className="mb-4">
-          <label className="block text-xs font-bold text-pretty-wine-900 mb-2 flex items-center space-x-1.5">
-            <User className="w-3.5 h-3.5 text-pretty-pink-500" />
-            <span>1. Selecciona la Esteticista para el nuevo horario:</span>
+        {/* ========================================================================= */}
+        {/* 1. SELECTOR DROPDOWN DE ESTETICISTA: DEJAR LA MISMA O CAMBIARLA */}
+        {/* ========================================================================= */}
+        <div className="mb-4" ref={profDropdownRef}>
+          <label className="block text-xs font-bold text-pretty-wine-900 mb-1.5 flex items-center justify-between">
+            <div className="flex items-center space-x-1.5">
+              <User className="w-3.5 h-3.5 text-pretty-pink-500" />
+              <span>1. Esteticista: ¿Cambiarla o dejar la misma?</span>
+            </div>
+            <span className="text-[10px] text-pretty-wine-600 font-normal">
+              Haz clic para elegir
+            </span>
           </label>
-          
-          <div className="flex flex-wrap gap-2">
+
+          {/* Botón Disparador del Dropdown */}
+          <div className="relative">
             <button
               type="button"
-              onClick={() => {
-                setSelectedProfId('all');
-                loadUnlockedDays('all');
-              }}
-              className={`inline-flex items-center space-x-1.5 px-3 py-1.5 rounded-full text-xs font-semibold border transition-all ${
-                selectedProfId === 'all'
-                  ? 'bg-pretty-wine-900 text-white border-pretty-wine-900 shadow-sm'
-                  : 'bg-white hover:bg-pretty-pink-50 text-pretty-wine-900 border-pretty-pink-200 shadow-2xs'
+              onClick={() => setIsProfDropdownOpen((prev) => !prev)}
+              className={`w-full p-2.5 rounded-2xl border text-left flex items-center justify-between transition-all shadow-xs ${
+                isProfDropdownOpen
+                  ? 'bg-white border-pretty-wine-900 ring-2 ring-pretty-wine-900/10'
+                  : selectedProfInfo.isCurrent
+                  ? 'bg-white/90 border-emerald-300 hover:bg-white'
+                  : selectedProfInfo.isAll
+                  ? 'bg-white/90 border-pretty-pink-200 hover:bg-white'
+                  : 'bg-white/90 border-pretty-wine-300 hover:bg-white'
               }`}
             >
-              <Users className="w-3 h-3 text-pretty-pink-400" />
-              <span>Cualquier esteticista libre</span>
+              <div className="flex items-center space-x-2.5 min-w-0 pr-2">
+                {/* Avatar o Icono */}
+                <div className={`w-8 h-8 rounded-xl flex items-center justify-center font-bold text-xs flex-shrink-0 ${
+                  selectedProfInfo.isCurrent
+                    ? 'bg-emerald-100 text-emerald-900'
+                    : selectedProfInfo.isAll
+                    ? 'bg-pretty-pink-100 text-pretty-wine-900'
+                    : 'bg-pretty-wine-900 text-white'
+                }`}>
+                  {selectedProfInfo.isAll ? (
+                    <Users className="w-4 h-4 text-pretty-pink-600" />
+                  ) : (
+                    <span>{selectedProfInfo.initials || 'ES'}</span>
+                  )}
+                </div>
+
+                <div className="min-w-0">
+                  <div className="flex items-center space-x-2">
+                    <span className="font-bold text-xs text-pretty-wine-950 truncate">
+                      {selectedProfInfo.title}
+                    </span>
+                    <span className={`text-[9px] font-bold px-1.5 py-0.2 rounded-full uppercase tracking-wider ${
+                      selectedProfInfo.isCurrent
+                        ? 'bg-emerald-100 text-emerald-800 border border-emerald-200'
+                        : selectedProfInfo.isAll
+                        ? 'bg-pretty-pink-100 text-pretty-wine-800'
+                        : 'bg-pretty-wine-100 text-pretty-wine-900 font-bold border border-pretty-wine-300'
+                    }`}>
+                      {selectedProfInfo.badge}
+                    </span>
+                  </div>
+                  <p className="text-[11px] text-pretty-wine-700/80 truncate mt-0.2">
+                    {selectedProfInfo.subtitle}
+                  </p>
+                </div>
+              </div>
+
+              <ChevronDown
+                className={`w-4 h-4 text-pretty-wine-700 flex-shrink-0 transition-transform duration-200 ${
+                  isProfDropdownOpen ? 'rotate-180 text-pretty-wine-950' : ''
+                }`}
+              />
             </button>
 
-            {professionals.map((p) => {
-              const isSelected = selectedProfId === p.id;
-              const isCurrent = p.id === (booking.professionalId || booking.professional?.id);
-
-              return (
-                <button
-                  key={p.id}
-                  type="button"
-                  onClick={() => {
-                    setSelectedProfId(p.id);
-                    loadUnlockedDays(p.id);
-                  }}
-                  className={`inline-flex items-center space-x-1.5 px-3 py-1.5 rounded-full text-xs font-semibold border transition-all ${
-                    isSelected
-                      ? 'bg-pretty-wine-900 text-white border-pretty-wine-900 shadow-sm'
-                      : 'bg-white hover:bg-pretty-pink-50 text-pretty-wine-900 border-pretty-pink-200 shadow-2xs'
-                  }`}
-                >
-                  <div className={`w-4 h-4 rounded-full flex items-center justify-center text-[9px] font-bold ${
-                    isSelected ? 'bg-white/20 text-white' : 'bg-pretty-pink-100 text-pretty-wine-900'
-                  }`}>
-                    {p.name.slice(0, 1)}
+            {/* Popover / Menú desplegable */}
+            {isProfDropdownOpen && (
+              <div className="absolute left-0 right-0 top-full mt-1.5 bg-white rounded-2xl p-2.5 shadow-2xl border border-pretty-pink-200 z-50 animate-fade-in space-y-2">
+                
+                {/* Buscador dentro del dropdown */}
+                {professionals.length > 2 && (
+                  <div className="relative">
+                    <Search className="w-3 h-3 absolute left-2.5 top-2.5 text-pretty-wine-500" />
+                    <input
+                      type="text"
+                      autoFocus
+                      placeholder="Buscar esteticista..."
+                      value={profSearchQuery}
+                      onChange={(e) => setProfSearchQuery(e.target.value)}
+                      className="w-full h-8 pl-7 pr-7 text-xs rounded-xl border border-pretty-pink-200 bg-pretty-pink-50/50 focus:bg-white focus:outline-none focus:ring-1 focus:ring-pretty-pink-400 text-pretty-wine-900"
+                    />
+                    {profSearchQuery && (
+                      <button
+                        type="button"
+                        onClick={() => setProfSearchQuery('')}
+                        className="absolute right-2 top-2 p-0.5 rounded-full text-pretty-wine-400 hover:text-pretty-wine-700 transition-colors"
+                      >
+                        <X className="w-3 h-3" />
+                      </button>
+                    )}
                   </div>
-                  <span>{p.name}</span>
-                  {isCurrent && (
-                    <span className={`text-[9px] px-1 rounded ${
-                      isSelected ? 'bg-white/30 text-white' : 'bg-pretty-pink-100 text-pretty-pink-700'
-                    }`}>
-                      Actual
-                    </span>
+                )}
+
+                <div className="max-h-56 overflow-y-auto space-y-1.5 pr-0.5">
+                  {/* OPCIÓN 1: DEJAR LA MISMA ESTETICISTA (si ya tiene una asignada) */}
+                  {currentBookingProf && !profSearchQuery && (
+                    <button
+                      type="button"
+                      onClick={() => handleSelectProf(currentBookingProf.id)}
+                      className={`w-full p-2 rounded-xl text-left flex items-center justify-between transition-all border ${
+                        selectedProfId === currentBookingProf.id
+                          ? 'bg-emerald-50 border-emerald-300 ring-1 ring-emerald-300'
+                          : 'bg-white hover:bg-emerald-50/50 border-gray-100 hover:border-emerald-200'
+                      }`}
+                    >
+                      <div className="flex items-center space-x-2.5 truncate">
+                        <div className="w-7 h-7 rounded-lg bg-emerald-100 text-emerald-900 flex items-center justify-center font-bold text-xs flex-shrink-0">
+                          {currentBookingProf.name.slice(0, 2).toUpperCase()}
+                        </div>
+                        <div className="min-w-0">
+                          <div className="flex items-center space-x-1.5">
+                            <span className="font-bold text-xs text-pretty-wine-900 truncate">
+                              {currentBookingProf.name}
+                            </span>
+                            <span className="text-[9px] font-bold px-1.5 py-0.2 rounded-full bg-emerald-100 text-emerald-800 border border-emerald-200">
+                              Dejar la misma (Actual)
+                            </span>
+                          </div>
+                          <p className="text-[10px] text-pretty-wine-600 truncate">
+                            Mantener asignada a {currentBookingProf.name} en el nuevo horario
+                          </p>
+                        </div>
+                      </div>
+                      {selectedProfId === currentBookingProf.id && (
+                        <Check className="w-4 h-4 text-emerald-600 flex-shrink-0 ml-2" />
+                      )}
+                    </button>
                   )}
-                </button>
-              );
-            })}
+
+                  {/* OPCIÓN 2: CUALQUIER ESTETICISTA LIBRE */}
+                  {!profSearchQuery && (
+                    <button
+                      type="button"
+                      onClick={() => handleSelectProf('all')}
+                      className={`w-full p-2 rounded-xl text-left flex items-center justify-between transition-all border ${
+                        selectedProfId === 'all'
+                          ? 'bg-pretty-wine-900 text-white border-pretty-wine-900 shadow-xs'
+                          : 'bg-white hover:bg-pretty-pink-50 border-gray-100 hover:border-pretty-pink-200'
+                      }`}
+                    >
+                      <div className="flex items-center space-x-2.5 truncate">
+                        <div className={`w-7 h-7 rounded-lg flex items-center justify-center flex-shrink-0 ${
+                          selectedProfId === 'all' ? 'bg-white/20 text-white' : 'bg-pretty-pink-100 text-pretty-wine-800'
+                        }`}>
+                          <Users className="w-3.5 h-3.5" />
+                        </div>
+                        <div className="min-w-0">
+                          <div className="flex items-center space-x-1.5">
+                            <span className={`font-bold text-xs truncate ${
+                              selectedProfId === 'all' ? 'text-white' : 'text-pretty-wine-900'
+                            }`}>
+                              Cualquier esteticista libre
+                            </span>
+                            <span className={`text-[9px] font-semibold px-1.5 py-0.2 rounded-full ${
+                              selectedProfId === 'all' ? 'bg-white/20 text-white' : 'bg-pretty-pink-100 text-pretty-wine-800'
+                            }`}>
+                              Ver todo
+                            </span>
+                          </div>
+                          <p className={`text-[10px] truncate ${
+                            selectedProfId === 'all' ? 'text-white/80' : 'text-pretty-wine-600'
+                          }`}>
+                            Revisa horarios de todo el equipo del salón
+                          </p>
+                        </div>
+                      </div>
+                      {selectedProfId === 'all' && (
+                        <Check className="w-4 h-4 text-pretty-pink-300 flex-shrink-0 ml-2" />
+                      )}
+                    </button>
+                  )}
+
+                  {/* SECCIÓN 3: CAMBIAR A OTRA ESTETICISTA */}
+                  <div className="pt-1">
+                    <div className="text-[10px] font-bold uppercase text-pretty-pink-700 tracking-wider px-2 py-1 flex items-center space-x-1">
+                      <RefreshCw className="w-2.5 h-2.5 text-pretty-pink-500" />
+                      <span>Cambiar a otra compañera:</span>
+                    </div>
+
+                    <div className="space-y-1 mt-0.5">
+                      {filteredProfessionals.map((p) => {
+                        const isCurrent = currentBookingProfId && p.id === currentBookingProfId;
+                        const isSelected = selectedProfId === p.id;
+                        // Si ya se mostró arriba como "Actual", podemos omitirlo o mostrarlo con etiqueta clara
+                        if (isCurrent && !profSearchQuery) return null;
+
+                        return (
+                          <button
+                            type="button"
+                            key={p.id}
+                            onClick={() => handleSelectProf(p.id)}
+                            className={`w-full p-2 rounded-xl text-left flex items-center justify-between transition-all border ${
+                              isSelected
+                                ? 'bg-pretty-wine-900 text-white border-pretty-wine-900 shadow-xs'
+                                : 'bg-white hover:bg-pretty-pink-50 border-gray-100 hover:border-pretty-pink-200 text-pretty-wine-900'
+                            }`}
+                          >
+                            <div className="flex items-center space-x-2.5 truncate">
+                              <div className={`w-7 h-7 rounded-lg flex items-center justify-center font-bold text-xs flex-shrink-0 ${
+                                isSelected ? 'bg-white/20 text-white' : 'bg-pretty-wine-100 text-pretty-wine-900'
+                              }`}>
+                                {p.name.slice(0, 2).toUpperCase()}
+                              </div>
+                              <div className="min-w-0">
+                                <div className="flex items-center space-x-1.5">
+                                  <span className={`font-bold text-xs truncate ${
+                                    isSelected ? 'text-white' : 'text-pretty-wine-900'
+                                  }`}>
+                                    {p.name}
+                                  </span>
+                                  <span className={`text-[9px] font-semibold px-1.5 py-0.2 rounded-full ${
+                                    isSelected
+                                      ? 'bg-white/20 text-white'
+                                      : 'bg-pretty-wine-100 text-pretty-wine-900'
+                                  }`}>
+                                    {isCurrent ? 'Actual' : 'Cambiar a esta'}
+                                  </span>
+                                </div>
+                                <p className={`text-[10px] truncate ${
+                                  isSelected ? 'text-white/80' : 'text-pretty-wine-600'
+                                }`}>
+                                  {isCurrent
+                                    ? 'Mantener misma esteticista'
+                                    : `Reasignar cita a ${p.name} (${p.title || 'Especialista'})`}
+                                </p>
+                              </div>
+                            </div>
+                            {isSelected && (
+                              <Check className="w-4 h-4 text-pretty-pink-300 flex-shrink-0 ml-2" />
+                            )}
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
+
+                </div>
+              </div>
+            )}
           </div>
         </div>
 
-        {/* 2. Selector Interactivo de Nueva Fecha (Barra de Días + Selector Calendario) */}
+        {/* ========================================================================= */}
+        {/* 2. SELECTOR INTERACTIVO DE NUEVA FECHA (BARRA DE DÍAS + SELECTOR CALENDARIO) */}
+        {/* ========================================================================= */}
         <div className="mb-4">
           <div className="flex items-center justify-between mb-2">
             <label className="text-xs font-bold text-pretty-wine-900 flex items-center space-x-1.5">
@@ -420,20 +694,16 @@ export function RescheduleModal({
                   className={`p-2 rounded-2xl border text-center transition-all ${
                     isSelected
                       ? 'bg-pretty-wine-900 text-white border-pretty-wine-900 shadow-md scale-102'
-                      : 'bg-white hover:bg-pretty-pink-50 text-pretty-wine-900 border-pretty-pink-200/80 shadow-2xs'
+                      : 'bg-white hover:bg-pretty-pink-50 text-pretty-wine-900 border-pretty-pink-200/70 shadow-2xs'
                   }`}
                 >
-                  <span className={`text-[10px] font-bold uppercase block ${
-                    isSelected ? 'text-pretty-pink-300' : 'text-pretty-wine-700/80'
-                  }`}>
+                  <span className="block text-[10px] uppercase font-semibold opacity-80">
                     {qd.dayName}
                   </span>
-                  <span className="text-base font-serif font-bold block my-0.5">
+                  <span className="block font-serif text-base font-bold my-0.5">
                     {qd.dayNum}
                   </span>
-                  <span className={`text-[9px] block ${
-                    isSelected ? 'text-white/80' : 'text-pretty-wine-700/60'
-                  }`}>
+                  <span className="block text-[9px] uppercase font-medium opacity-70">
                     {qd.monthName}
                   </span>
                 </button>
@@ -441,52 +711,56 @@ export function RescheduleModal({
             })}
           </div>
 
-          {/* Selector de fecha nativo para cualquier otra fecha */}
+          {/* Selector de fecha nativo (para buscar cualquier otra fecha del año) */}
           <div className="flex items-center space-x-2">
-            <span className="text-[11px] text-pretty-wine-700/80 whitespace-nowrap">
-              O elige otra fecha:
-            </span>
             <input
               type="date"
               value={selectedDate}
-              min={new Date().toISOString().split('T')[0]}
               onChange={(e) => setSelectedDate(e.target.value)}
-              className="flex-1 px-3 py-1.5 rounded-xl border border-pretty-pink-200 bg-white text-xs font-semibold text-pretty-wine-900 focus:outline-none focus:ring-2 focus:ring-pretty-pink-400"
+              className="flex-1 px-3 py-2 rounded-xl border border-pretty-pink-200 bg-white text-xs text-pretty-wine-900 focus:outline-none focus:ring-2 focus:ring-pretty-pink-400 font-medium"
             />
+            {loadingDays && (
+              <span className="text-[11px] text-pretty-wine-600 animate-pulse">
+                Cargando...
+              </span>
+            )}
           </div>
         </div>
 
-        {/* 3. Selector Interactivo de Nueva Hora / Slots con Feedback de No Disponibilidad */}
+        {/* ========================================================================= */}
+        {/* 3. SELECTOR INTERACTIVO DE HORARIO / TURNOS DISPONIBLES */}
+        {/* ========================================================================= */}
         <div className="mb-4">
           <div className="flex items-center justify-between mb-2">
             <label className="text-xs font-bold text-pretty-wine-900 flex items-center space-x-1.5">
               <Clock className="w-3.5 h-3.5 text-pretty-pink-500" />
               <span>3. Selecciona la Nueva Hora:</span>
             </label>
-            <span className="text-[11px] text-pretty-wine-700/70">
-              Duración: {booking.durationMinutes || booking.snapshotDurationMinutes || 60} min
-            </span>
+            {availableSlots.length > 0 && (
+              <span className="text-[11px] text-pretty-wine-700/80">
+                {availableSlots.filter((s) => s.available).length} turnos libres encontrados
+              </span>
+            )}
           </div>
 
           {loadingSlots ? (
-            <div className="py-8 text-center text-xs text-pretty-wine-800/80 bg-white/40 rounded-2xl border border-white">
-              Consultando turnos libres con el equipo...
-            </div>
-          ) : !selectedDate ? (
-            <div className="py-8 text-center text-xs text-pretty-wine-800/70 bg-white/40 rounded-2xl border border-white">
-              Selecciona una fecha arriba para cargar los turnos disponibles.
+            <div className="p-8 text-center bg-white/50 rounded-2xl border border-pretty-pink-100">
+              <div className="w-5 h-5 border-2 border-pretty-wine-900 border-t-transparent rounded-full animate-spin mx-auto mb-2"></div>
+              <p className="text-xs text-pretty-wine-800">
+                Consultando disponibilidad para {selectedProfInfo.title} el {selectedDate}...
+              </p>
             </div>
           ) : availableSlots.length === 0 ? (
-            <div className="py-8 text-center text-xs text-pretty-wine-800/80 bg-white/60 rounded-2xl border border-white/80 p-4">
-              <AlertCircle className="w-5 h-5 text-pretty-pink-500 mx-auto mb-1.5" />
-              <span className="font-semibold block">No hay turnos disponibles para esta fecha.</span>
-              <span className="text-[11px] text-pretty-wine-700/70 mt-1 block">
-                Verifica que la fecha tenga jornada abierta o selecciona otra esteticista.
-              </span>
+            <div className="p-5 text-center bg-white/70 rounded-2xl border border-pretty-pink-200">
+              <p className="text-xs font-semibold text-pretty-wine-900">
+                No hay turnos disponibles para esta fecha.
+              </p>
+              <p className="text-[11px] text-pretty-wine-700/80 mt-1">
+                Verifica que la jornada esté abierta en la pestaña de Apertura de Agenda o prueba con otro día.
+              </p>
             </div>
           ) : (
             <div className="space-y-3">
-              
               {/* Sección Mañana si hay */}
               {morningSlots.length > 0 && (
                 <div>
@@ -550,10 +824,17 @@ export function RescheduleModal({
             </div>
             <div className="text-right">
               <span className="text-[11px] text-emerald-800">Esteticista:</span>
-              <div className="font-bold">
-                {selectedProfId === 'all'
-                  ? 'Cualquiera libre'
-                  : professionals.find((p) => p.id === selectedProfId)?.name || 'Asignada'}
+              <div className="font-bold flex items-center justify-end space-x-1">
+                <span>{selectedProfInfo.title}</span>
+                {selectedProfInfo.isCurrent ? (
+                  <span className="text-[9px] px-1 rounded bg-emerald-200 text-emerald-900 font-bold">
+                    Misma
+                  </span>
+                ) : !selectedProfInfo.isAll ? (
+                  <span className="text-[9px] px-1 rounded bg-pretty-wine-200 text-pretty-wine-900 font-bold">
+                    Reasignada
+                  </span>
+                ) : null}
               </div>
             </div>
           </div>
