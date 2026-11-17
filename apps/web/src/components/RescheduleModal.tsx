@@ -269,7 +269,19 @@ export function RescheduleModal({
     minute: '2-digit'
   });
 
+  const isCompleted = booking?.status === 'COMPLETED';
+  const isCancelled = booking?.status === 'CANCELLED';
+
   async function handleConfirmReschedule() {
+    if (isCompleted) {
+      setErrorMsg('Una cita completada ya ha sido atendida y no puede cambiarse de fecha ni hora.');
+      return;
+    }
+    if (isCancelled) {
+      setErrorMsg('Una cita cancelada no puede cambiarse de fecha ni hora.');
+      return;
+    }
+
     if (!selectedSlot) {
       setErrorMsg('Debes seleccionar un horario disponible para reprogramar la cita.');
       return;
@@ -416,6 +428,26 @@ export function RescheduleModal({
             </span>
           </div>
         </div>
+
+        {isCompleted && (
+          <div className="mb-4 p-3.5 rounded-2xl bg-amber-50 border border-amber-200 text-xs text-amber-900 flex items-start space-x-2">
+            <AlertCircle className="w-4 h-4 text-amber-600 flex-shrink-0 mt-0.5" />
+            <div>
+              <strong className="block font-semibold">Cita Completada</strong>
+              <span>Esta cita ya ha sido realizada y completada. Por seguridad y trazabilidad del historial del salón, las citas completadas no pueden cambiarse de fecha ni hora.</span>
+            </div>
+          </div>
+        )}
+
+        {isCancelled && (
+          <div className="mb-4 p-3.5 rounded-2xl bg-rose-50 border border-rose-200 text-xs text-rose-900 flex items-start space-x-2">
+            <AlertCircle className="w-4 h-4 text-rose-600 flex-shrink-0 mt-0.5" />
+            <div>
+              <strong className="block font-semibold">Cita Cancelada</strong>
+              <span>Esta cita se encuentra cancelada y no puede cambiarse de fecha ni hora.</span>
+            </div>
+          </div>
+        )}
 
         {/* ========================================================================= */}
         {/* 1. SELECTOR DROPDOWN DE ESTETICISTA: DEJAR LA MISMA O CAMBIARLA */}
@@ -877,9 +909,9 @@ export function RescheduleModal({
           <button
             type="button"
             onClick={handleConfirmReschedule}
-            disabled={submitting || !selectedSlot}
+            disabled={submitting || !selectedSlot || isCompleted || isCancelled}
             className={`w-full sm:w-auto inline-flex items-center justify-center space-x-2 px-6 py-2 rounded-full text-xs font-bold text-white transition-all shadow-sm ${
-              !selectedSlot || submitting
+              !selectedSlot || submitting || isCompleted || isCancelled
                 ? 'bg-gray-300 text-gray-500 cursor-not-allowed opacity-75'
                 : 'bg-pretty-wine-900 hover:bg-pretty-pink-600 active:scale-95'
             }`}

@@ -285,6 +285,51 @@ export function buildWhatsAppCancellationMessage(params: WhatsAppCancellationPar
   return lines.join('\n');
 }
 
+export interface WhatsAppCompletedParams {
+  voice: WhatsAppVoice;
+  clientName: string;
+  clientPhone: string;
+  professionalName: string;
+  serviceName: string;
+  referenceCode: string;
+  formattedDate?: string;
+}
+
+/**
+ * Genera el texto del mensaje de agradecimiento al completar una cita para WhatsApp.
+ */
+export function buildWhatsAppCompletedMessage(params: WhatsAppCompletedParams): string {
+  const {
+    voice,
+    clientName,
+    professionalName,
+    serviceName,
+    referenceCode
+  } = params;
+
+  const greeting = voice === 'AS_PROFESSIONAL'
+    ? `¡Hola, ${clientName}! Soy ${professionalName} de Caño Negro Pretty.`
+    : `¡Hola, ${clientName}! Te saludamos con mucho cariño de Caño Negro Pretty.`;
+
+  const signoff = voice === 'AS_PROFESSIONAL'
+    ? `Con cariño, ${professionalName}`
+    : 'Con cariño, el equipo de Caño Negro Pretty';
+
+  return [
+    greeting,
+    '',
+    `Queremos agradecerte de todo corazón por tu visita y por confiar en nosotras para tu servicio de ${serviceName} (Cita #${referenceCode}).`,
+    '',
+    'Esperamos que hayas disfrutado mucho tu experiencia y que te sientas tan consentida como mereces.',
+    '',
+    'Si tienes alguna duda sobre los cuidados de tu servicio o deseas reservar tu próxima cita, estamos con todo el gusto a tu disposición por este medio o en nuestra web.',
+    '',
+    '¡Fue un verdadero placer atenderte y esperamos verte muy pronto!',
+    '',
+    signoff
+  ].join('\n');
+}
+
 /**
  * Crea el link directo https://wa.me/...
  */

@@ -337,6 +337,17 @@ export default function AdminDashboardPage() {
         }
       }
 
+      // Si se completó, abrir automáticamente el modal de WhatsApp con la plantilla de agradecimiento
+      if (newStatus === 'COMPLETED') {
+        const completedBooking = bookings.find((b) => b.id === bookingId);
+        if (completedBooking) {
+          setSelectedBookingForWa({ ...completedBooking, status: 'COMPLETED' });
+          setWaInitialTemplate('completed');
+          setPreviousScheduleForWa(undefined);
+          setIsWaOpen(true);
+        }
+      }
+
       // Si se canceló o rechazó, abrir automáticamente el modal de WhatsApp con la plantilla de cancelación
       if (newStatus === 'CANCELLED' || newStatus === 'REJECTED') {
         const targetBooking = bookings.find((b) => b.id === bookingId);
@@ -1112,31 +1123,53 @@ export default function AdminDashboardPage() {
 
                             {/* Acciones */}
                             <div className="pt-2 flex flex-wrap items-center justify-end gap-1.5 border-t border-pretty-pink-100">
-                              <button
-                                type="button"
-                                onClick={() => {
-                                  setSelectedBookingForReschedule(b);
-                                  setIsRescheduleOpen(true);
-                                }}
-                                className="inline-flex items-center space-x-1 px-2.5 py-1 rounded-full text-xs font-semibold bg-white hover:bg-pretty-pink-50 text-pretty-wine-900 border border-pretty-pink-200 transition-all"
-                                title="Cambiar fecha u hora de la cita"
-                              >
-                                <CalendarClock className="w-3 h-3 text-pretty-pink-500" />
-                                <span>Cambiar fecha y hora</span>
-                              </button>
+                              {b.status !== 'COMPLETED' && b.status !== 'CANCELLED' && b.status !== 'REJECTED' && (
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    setSelectedBookingForReschedule(b);
+                                    setIsRescheduleOpen(true);
+                                  }}
+                                  className="inline-flex items-center space-x-1 px-2.5 py-1 rounded-full text-xs font-semibold bg-white hover:bg-pretty-pink-50 text-pretty-wine-900 border border-pretty-pink-200 transition-all"
+                                  title="Cambiar fecha u hora de la cita"
+                                >
+                                  <CalendarClock className="w-3 h-3 text-pretty-pink-500" />
+                                  <span>Cambiar fecha y hora</span>
+                                </button>
+                              )}
 
                               <button
                                 type="button"
                                 onClick={() => {
                                   setSelectedBookingForWa(b);
-                                  setWaInitialTemplate('confirmation');
+                                  setWaInitialTemplate(
+                                    b.status === 'COMPLETED'
+                                      ? 'completed'
+                                      : b.status === 'CANCELLED' || b.status === 'REJECTED'
+                                      ? 'cancellation'
+                                      : 'confirmation'
+                                  );
                                   setPreviousScheduleForWa(undefined);
                                   setIsWaOpen(true);
                                 }}
-                                className="inline-flex items-center space-x-1 px-2.5 py-1 rounded-full text-xs font-semibold bg-white hover:bg-pretty-pink-50 text-pretty-wine-900 border border-pretty-pink-200"
+                                className={`inline-flex items-center space-x-1 px-2.5 py-1 rounded-full text-xs font-semibold border transition-all ${
+                                  b.status === 'COMPLETED'
+                                    ? 'bg-pretty-pink-100/80 hover:bg-pretty-pink-200 text-pretty-wine-900 border-pretty-pink-300'
+                                    : 'bg-white hover:bg-pretty-pink-50 text-pretty-wine-900 border-pretty-pink-200'
+                                }`}
+                                title={b.status === 'COMPLETED' ? 'Enviar mensaje de agradecimiento por WhatsApp' : 'Abrir WhatsApp'}
                               >
-                                <MessageSquare className="w-3 h-3 text-emerald-600" />
-                                <span>WhatsApp</span>
+                                {b.status === 'COMPLETED' ? (
+                                  <>
+                                    <Sparkles className="w-3 h-3 text-pretty-pink-600" />
+                                    <span>Agradecimiento</span>
+                                  </>
+                                ) : (
+                                  <>
+                                    <MessageSquare className="w-3 h-3 text-emerald-600" />
+                                    <span>WhatsApp</span>
+                                  </>
+                                )}
                               </button>
 
                               {b.status === 'CONFIRMED' && (
@@ -1352,31 +1385,53 @@ export default function AdminDashboardPage() {
 
                         {/* Acciones */}
                         <div className="pt-2 flex flex-wrap items-center justify-end gap-1.5 border-t border-pretty-pink-100">
-                          <button
-                            type="button"
-                            onClick={() => {
-                              setSelectedBookingForReschedule(b);
-                              setIsRescheduleOpen(true);
-                            }}
-                            className="inline-flex items-center space-x-1 px-2.5 py-1 rounded-full text-xs font-semibold bg-white hover:bg-pretty-pink-50 text-pretty-wine-900 border border-pretty-pink-200 transition-all"
-                            title="Cambiar fecha u hora de la cita"
-                          >
-                            <CalendarClock className="w-3 h-3 text-pretty-pink-500" />
-                            <span>Cambiar fecha y hora</span>
-                          </button>
+                          {b.status !== 'COMPLETED' && b.status !== 'CANCELLED' && b.status !== 'REJECTED' && (
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setSelectedBookingForReschedule(b);
+                                setIsRescheduleOpen(true);
+                              }}
+                              className="inline-flex items-center space-x-1 px-2.5 py-1 rounded-full text-xs font-semibold bg-white hover:bg-pretty-pink-50 text-pretty-wine-900 border border-pretty-pink-200 transition-all"
+                              title="Cambiar fecha u hora de la cita"
+                            >
+                              <CalendarClock className="w-3 h-3 text-pretty-pink-500" />
+                              <span>Cambiar fecha y hora</span>
+                            </button>
+                          )}
 
                           <button
                             type="button"
                             onClick={() => {
                               setSelectedBookingForWa(b);
-                              setWaInitialTemplate('confirmation');
+                              setWaInitialTemplate(
+                                b.status === 'COMPLETED'
+                                  ? 'completed'
+                                  : b.status === 'CANCELLED' || b.status === 'REJECTED'
+                                  ? 'cancellation'
+                                  : 'confirmation'
+                              );
                               setPreviousScheduleForWa(undefined);
                               setIsWaOpen(true);
                             }}
-                            className="inline-flex items-center space-x-1 px-2.5 py-1 rounded-full text-xs font-semibold bg-white hover:bg-pretty-pink-50 text-pretty-wine-900 border border-pretty-pink-200"
+                            className={`inline-flex items-center space-x-1 px-2.5 py-1 rounded-full text-xs font-semibold border transition-all ${
+                              b.status === 'COMPLETED'
+                                ? 'bg-pretty-pink-100/80 hover:bg-pretty-pink-200 text-pretty-wine-900 border-pretty-pink-300'
+                                : 'bg-white hover:bg-pretty-pink-50 text-pretty-wine-900 border-pretty-pink-200'
+                            }`}
+                            title={b.status === 'COMPLETED' ? 'Enviar mensaje de agradecimiento por WhatsApp' : 'Abrir WhatsApp'}
                           >
-                            <MessageSquare className="w-3 h-3 text-emerald-600" />
-                            <span>WhatsApp</span>
+                            {b.status === 'COMPLETED' ? (
+                              <>
+                                <Sparkles className="w-3 h-3 text-pretty-pink-600" />
+                                <span>Agradecimiento</span>
+                              </>
+                            ) : (
+                              <>
+                                <MessageSquare className="w-3 h-3 text-emerald-600" />
+                                <span>WhatsApp</span>
+                              </>
+                            )}
                           </button>
 
                           {b.status === 'CONFIRMED' && (

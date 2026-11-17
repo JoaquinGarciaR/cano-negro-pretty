@@ -7,11 +7,12 @@ import {
   buildWhatsAppRescheduleMessage,
   buildWhatsAppReminderMessage,
   buildWhatsAppCancellationMessage,
+  buildWhatsAppCompletedMessage,
   buildWhatsAppLink,
   WhatsAppVoice
 } from '@cano/shared';
 
-export type WhatsAppTemplateType = 'confirmation' | 'reschedule' | 'reminder' | 'cancellation';
+export type WhatsAppTemplateType = 'confirmation' | 'reschedule' | 'reminder' | 'cancellation' | 'completed';
 
 interface WhatsAppModalProps {
   isOpen: boolean;
@@ -103,6 +104,16 @@ export function WhatsAppModal({
           referenceCode: booking.referenceCode,
           reason: cancellationReason
         });
+      } else if (templateType === 'completed') {
+        generated = buildWhatsAppCompletedMessage({
+          voice,
+          clientName: booking.clientName,
+          clientPhone: booking.clientPhone,
+          professionalName: booking.professional?.name || 'Esteticista',
+          serviceName: booking.serviceName || booking.snapshotServiceName,
+          referenceCode: booking.referenceCode,
+          formattedDate
+        });
       } else {
         generated = buildWhatsAppMessage({
           voice,
@@ -159,6 +170,8 @@ export function WhatsAppModal({
               ? 'Mensaje de Recordatorio'
               : templateType === 'cancellation'
               ? 'Mensaje de Cancelación de Cita'
+              : templateType === 'completed'
+              ? 'Mensaje de Agradecimiento (Cita Completada)'
               : 'Mensaje de Confirmación'}
           </h3>
           <p className="text-xs text-pretty-wine-800/80 mt-0.5 leading-relaxed">
@@ -171,7 +184,7 @@ export function WhatsAppModal({
           <label className="block text-xs font-semibold text-pretty-wine-900 mb-1.5">
             Plantilla de mensaje:
           </label>
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-1.5 p-1 rounded-2xl bg-pretty-pink-100/70 border border-pretty-pink-200/60">
+          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-1.5 p-1 rounded-2xl bg-pretty-pink-100/70 border border-pretty-pink-200/60">
             <button
               type="button"
               onClick={() => setTemplateType('confirmation')}
@@ -194,7 +207,7 @@ export function WhatsAppModal({
               }`}
             >
               <CalendarClock className="w-3 h-3 text-pretty-pink-400" />
-              <span>Fecha y Hora</span>
+              <span>Fecha/Hora</span>
             </button>
             <button
               type="button"
@@ -210,8 +223,20 @@ export function WhatsAppModal({
             </button>
             <button
               type="button"
-              onClick={() => setTemplateType('cancellation')}
+              onClick={() => setTemplateType('completed')}
               className={`flex items-center justify-center space-x-1 py-1.5 px-2 rounded-xl text-xs font-bold transition-all ${
+                templateType === 'completed'
+                  ? 'bg-pretty-wine-900 text-white shadow-sm'
+                  : 'text-pretty-wine-900 hover:bg-white/60'
+              }`}
+            >
+              <Sparkles className="w-3 h-3 text-pretty-pink-400" />
+              <span>Agradecimiento</span>
+            </button>
+            <button
+              type="button"
+              onClick={() => setTemplateType('cancellation')}
+              className={`flex items-center justify-center space-x-1 py-1.5 px-2 rounded-xl text-xs font-bold transition-all col-span-2 sm:col-span-1 ${
                 templateType === 'cancellation'
                   ? 'bg-rose-700 text-white shadow-sm'
                   : 'text-pretty-wine-900 hover:bg-white/60'

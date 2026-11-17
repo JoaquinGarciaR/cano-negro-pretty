@@ -623,6 +623,18 @@ export async function rescheduleBooking(
       throw new Error('Reserva no encontrada');
     }
 
+    if (booking.status === BookingStatus.COMPLETED) {
+      const err: any = new Error('Una cita completada ya ha sido atendida y no puede cambiarse de fecha ni hora.');
+      err.code = 'COMPLETED_IMMUTABLE';
+      throw err;
+    }
+
+    if (booking.status === BookingStatus.CANCELLED) {
+      const err: any = new Error('Una cita cancelada no puede cambiarse de fecha ni hora.');
+      err.code = 'CANCELLED_IMMUTABLE';
+      throw err;
+    }
+
     const targetProfId = professionalId !== undefined ? (professionalId || null) : booking.professionalId;
     const durationMinutes = booking.snapshotDurationMinutes || 60;
     const startTime = new Date(startTimeISO);

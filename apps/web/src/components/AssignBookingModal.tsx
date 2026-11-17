@@ -54,6 +54,7 @@ export function AssignBookingModal({
 
   const durationMin = booking.durationMinutes || booking.snapshotDurationMinutes || 60;
   const currentAssignedProfId = booking.professionalId || booking.professional?.id;
+  const isCompleted = booking.status === 'COMPLETED';
 
   async function handleSelect(profId: string) {
     try {
@@ -210,7 +211,7 @@ export function AssignBookingModal({
                     <AlertTriangle className="w-3.5 h-3.5 text-rose-500 flex-shrink-0 mt-0.5" />
                     <div>
                       <span>Ya tiene la cita confirmada <strong>#{conflictingBooking.referenceCode}</strong> en este intervalo.</span>
-                      {onOpenReschedule && (
+                      {onOpenReschedule && !isCompleted && (
                         <button
                           type="button"
                           onClick={() => {
@@ -232,7 +233,7 @@ export function AssignBookingModal({
 
         {/* Pie de diálogo con opción de cambio de fecha y hora */}
         <div className="pt-3 border-t border-pretty-pink-200/50 flex flex-col sm:flex-row items-center justify-between gap-2 text-xs">
-          {onOpenReschedule ? (
+          {onOpenReschedule && !isCompleted ? (
             <button
               type="button"
               onClick={() => {
