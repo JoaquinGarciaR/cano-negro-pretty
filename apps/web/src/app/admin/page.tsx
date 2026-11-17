@@ -1418,7 +1418,7 @@ export default function AdminDashboardPage() {
         {/* TAB 3: APERTURA DE AGENDA Y DESBLOQUEO DE FECHAS */}
         {activeTab === 'availability' && (
           <div className="space-y-4">
-            <div className="glass-panel rounded-2xl p-3.5 sm:p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3 relative z-20">
+            <div className="glass-panel rounded-2xl p-3.5 sm:p-4 flex flex-col md:flex-row md:items-center justify-between gap-3.5 relative z-20">
               <div>
                 <h3 className="font-serif text-base sm:text-lg font-bold text-pretty-wine-900">
                   Apertura y Desbloqueo de Citas a Futuro
@@ -1428,48 +1428,53 @@ export default function AdminDashboardPage() {
                 </p>
               </div>
 
-              <div className="flex items-center space-x-2 flex-wrap gap-y-2">
+              <div className="flex flex-col sm:flex-row sm:items-center gap-2 w-full md:w-auto">
                 {currentUser?.role === 'OWNER' && (
-                  <StylistDropdown
-                    value={filterProfessionalId}
-                    onChange={setFilterProfessionalId}
-                    professionals={catalog?.professionals || []}
-                    allLabel="Todas las estilistas"
-                    allSublabel="Horarios globales del salón"
-                    showUnassigned={false}
-                    headerTitle="Filtrar Apertura"
-                    title="Filtrar horarios por estilista"
-                    searchPlaceholder="Buscar estilista..."
-                    align="left"
-                  />
+                  <div className="w-full sm:w-auto">
+                    <StylistDropdown
+                      value={filterProfessionalId}
+                      onChange={setFilterProfessionalId}
+                      professionals={catalog?.professionals || []}
+                      allLabel="Todas las estilistas"
+                      allSublabel="Horarios globales del salón"
+                      showUnassigned={false}
+                      headerTitle="Filtrar Apertura"
+                      title="Filtrar horarios por estilista"
+                      searchPlaceholder="Buscar estilista..."
+                      align="left"
+                      className="w-full sm:w-auto [&>button]:w-full [&>button]:justify-between sm:[&>button]:justify-start"
+                    />
+                  </div>
                 )}
 
-                <button
-                  type="button"
-                  onClick={() => {
-                    setSelectedDateForAvail(undefined);
-                    setAvailabilityModalMode('batch');
-                    setIsDayAvailOpen(true);
-                  }}
-                  className="inline-flex items-center space-x-1.5 px-3.5 py-1.5 rounded-full text-xs font-bold text-white bg-pretty-pink-600 hover:bg-pretty-wine-900 transition-all shadow-sm active:scale-95 flex-shrink-0"
-                  title="Abrir 1 mes completo o rango de fechas"
-                >
-                  <Sparkles className="w-3.5 h-3.5 text-pretty-pink-200" />
-                  <span>Extender Agenda 1 Mes</span>
-                </button>
+                <div className="grid grid-cols-2 sm:flex sm:items-center gap-2 w-full sm:w-auto">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setSelectedDateForAvail(undefined);
+                      setAvailabilityModalMode('batch');
+                      setIsDayAvailOpen(true);
+                    }}
+                    className="inline-flex items-center justify-center space-x-1.5 px-3.5 py-2 rounded-2xl text-xs font-bold text-white bg-pretty-pink-600 hover:bg-pretty-wine-900 transition-all shadow-sm active:scale-95 w-full sm:w-auto"
+                    title="Abrir 1 mes completo o rango de fechas"
+                  >
+                    <Sparkles className="w-3.5 h-3.5 text-pretty-pink-200" />
+                    <span>Extender 1 Mes</span>
+                  </button>
 
-                <button
-                  type="button"
-                  onClick={() => {
-                    setSelectedDateForAvail(undefined);
-                    setAvailabilityModalMode('single');
-                    setIsDayAvailOpen(true);
-                  }}
-                  className="inline-flex items-center space-x-1 px-3.5 py-1.5 rounded-full text-xs font-bold text-white bg-pretty-wine-900 hover:bg-pretty-pink-600 transition-all shadow-sm flex-shrink-0"
-                >
-                  <Unlock className="w-3.5 h-3.5" />
-                  <span>Apertura de Días</span>
-                </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setSelectedDateForAvail(undefined);
+                      setAvailabilityModalMode('single');
+                      setIsDayAvailOpen(true);
+                    }}
+                    className="inline-flex items-center justify-center space-x-1.5 px-3.5 py-2 rounded-2xl text-xs font-bold text-white bg-pretty-wine-900 hover:bg-pretty-pink-600 transition-all shadow-sm active:scale-95 w-full sm:w-auto"
+                  >
+                    <Unlock className="w-3.5 h-3.5" />
+                    <span>Apertura de Días</span>
+                  </button>
+                </div>
               </div>
             </div>
 

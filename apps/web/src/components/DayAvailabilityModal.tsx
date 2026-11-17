@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo, useRef } from 'react';
 import {
   X,
   Calendar,
@@ -13,7 +13,8 @@ import {
   Sparkles,
   CheckCircle2,
   Check,
-  ArrowRight
+  ChevronDown,
+  Search
 } from 'lucide-react';
 import { openDayApi, closeDayApi, batchOpenDaysApi } from '../lib/api';
 
@@ -40,6 +41,9 @@ export function DayAvailabilityModal({
   token,
   onSuccess
 }: DayAvailabilityModalProps) {
+  // ==========================================
+  // TODOS LOS HOOKS DECLARADOS AL INICIO (REGLA DE ORO DE REACT)
+  // ==========================================
   const [mode, setMode] = useState<'single' | 'batch'>(initialMode);
   const [selectedProfId, setSelectedProfId] = useState<string>(professionalId || 'all');
 
@@ -67,6 +71,11 @@ export function DayAvailabilityModal({
   const [error, setError] = useState<string | null>(null);
   const [successMsg, setSuccessMsg] = useState<string | null>(null);
 
+  // Dropdown de Esteticistas
+  const [isProfDropdownOpen, setIsProfDropdownOpen] = useState<boolean>(false);
+  const [profSearchQuery, setProfSearchQuery] = useState<string>('');
+  const profDropdownRef = useRef<HTMLDivElement>(null);
+
   // Sincronizar estado cuando se abre el modal
   useEffect(() => {
     if (isOpen) {
@@ -77,6 +86,8 @@ export function DayAvailabilityModal({
       }
       setError(null);
       setSuccessMsg(null);
+      setIsProfDropdownOpen(false);
+      setProfSearchQuery('');
       
       // Inicializar fechas de batch por defecto a +30 días
       const today = new Date();
@@ -88,18 +99,64 @@ export function DayAvailabilityModal({
     }
   }, [isOpen, initialDate, initialMode, professionalId]);
 
-  if (!isOpen) return null;
+  // Manejo de clic exterior y tecla Escape para el dropdown de esteticista
+  useEffect(() => {
+    function handleClickOutside(e: MouseEvent | TouchEvent) {
+      if (profDropdownRef.current && !profDropdownRef.current.contains(e.target as Node)) {
+        setIsProfDropdownOpen(false);
+      }
+    }
+    function handleKeyDown(e: KeyboardEvent) {
+      if (e.key === 'Escape') {
+        setIsProfDropdownOpen(false);
+      }
+    }
+    if (isProfDropdownOpen) {
+      document.addEventListener('pointerdown', handleClickOutside);
+      document.addEventListener('keydown', handleKeyDown);
+    }
+    return () => {
+      document.removeEventListener('pointerdown', handleClickOutside);
+      document.removeEventListener('keydown', handleKeyDown);
+    };
+  }, [isProfDropdownOpen]);
 
   // Lista de profesionales objetivo para la operación
-  const targetProfIds = selectedProfId === 'all'
-    ? professionals.map((p) => p.id)
-    : [selectedProfId];
-
-  const targetProfLabel = useMemo(() => {
-    if (selectedProfId === 'all') return 'Todas las esteticistas (Salón Completo)';
-    const found = professionals.find((p) => p.id === selectedProfId);
-    return found ? found.name : 'Esteticista seleccionada';
+  const targetProfIds = useMemo(() => {
+    return selectedProfId === 'all'
+      ? professionals.map((p) => p.id)
+      : [selectedProfId];
   }, [selectedProfId, professionals]);
+
+  // Información visual de la esteticista seleccionada
+  const targetProfInfo = useMemo(() => {
+    if (selectedProfId === 'all') {
+      return {
+        name: 'Todas las esteticistas',
+        subtitle: 'Apertura general para todo el equipo del salón',
+        badge: 'Salón Completo',
+        isAll: true,
+        initials: 'CN'
+      };
+    }
+    const found = professionals.find((p) => p.id === selectedProfId);
+    return {
+      name: found ? found.name : 'Esteticista seleccionada',
+      subtitle: found ? `Apertura exclusiva para ${found.name} (${found.title || 'Especialista'})` : 'Apertura individual',
+      badge: 'Individual',
+      isAll: false,
+      initials: found ? found.name.slice(0, 2).toUpperCase() : 'ES'
+    };
+  }, [selectedProfId, professionals]);
+
+  // Profesionales filtrados por la barra de búsqueda dentro del dropdown
+  const filteredProfessionals = useMemo(() => {
+    if (!profSearchQuery.trim()) return professionals;
+    const q = profSearchQuery.toLowerCase().trim();
+    return professionals.filter(
+      (p) => p.name.toLowerCase().includes(q) || (p.title || '').toLowerCase().includes(q)
+    );
+  }, [professionals, profSearchQuery]);
 
   const presetLabels: Record<string, string> = {
     '30': '+1 Mes (30 días)',
@@ -108,6 +165,11 @@ export function DayAvailabilityModal({
     'ene2027': 'Todo Enero 2027',
     'custom': 'Rango Personalizado'
   };
+
+  // ==========================================
+  // RETORNO TEMPRANO SOLO DESPUÉS DE TODOS LOS HOOKS
+  // ==========================================
+  if (!isOpen) return null;
 
   async function handleSaveSingle(e: React.FormEvent) {
     e.preventDefault();
@@ -136,7 +198,7 @@ export function DayAvailabilityModal({
         )
       );
 
-      setSuccessMsg(`Fecha ${date} desbloqueada exitosamente`);
+      setSuccessMsg(`Fecha ${date} desbloqueada exitosamente para ${targetProfInfo.name}`);
       setTimeout(() => {
         onSuccess(date);
         onClose();
@@ -164,7 +226,7 @@ export function DayAvailabilityModal({
         )
       );
 
-      setSuccessMsg(`Fecha ${date} bloqueada`);
+      setSuccessMsg(`Fecha ${date} bloqueada para ${targetProfInfo.name}`);
       setTimeout(() => {
         onSuccess(date);
         onClose();
@@ -212,7 +274,7 @@ export function DayAvailabilityModal({
       );
 
       const totalCount = results.reduce((acc: number, curr: any) => acc + (curr.count || 0), 0);
-      setSuccessMsg(`¡Agenda habilitada con éxito! (${totalCount} jornadas desbloqueadas del ${start} al ${end})`);
+      setSuccessMsg(`¡Agenda habilitada con éxito! (${totalCount} jornadas desbloqueadas del ${start} al ${end} para ${targetProfInfo.name})`);
       
       setTimeout(() => {
         onSuccess(start);
@@ -297,46 +359,201 @@ export function DayAvailabilityModal({
           </p>
         </div>
 
-        {/* Selector de Esteticista si hay varias */}
+        {/* ========================================================================= */}
+        {/* DROPDOWN INTERACTIVO PARA SELECCIONAR ESTETICISTA */}
+        {/* ========================================================================= */}
         {professionals.length > 0 && (
-          <div className="mb-4 p-3 rounded-2xl bg-pretty-pink-100/50 border border-pretty-pink-200/60">
-            <div className="flex items-center justify-between mb-1.5">
-              <label className="text-xs font-bold text-pretty-wine-900 flex items-center space-x-1.5">
+          <div className="mb-4" ref={profDropdownRef}>
+            <label className="block text-xs font-bold text-pretty-wine-900 mb-1.5 flex items-center justify-between">
+              <span className="flex items-center space-x-1.5">
                 <User className="w-3.5 h-3.5 text-pretty-pink-500" />
                 <span>Aplicar apertura para:</span>
-              </label>
-              <span className="text-[10px] font-semibold text-pretty-wine-700 truncate max-w-[180px]">
-                {targetProfLabel}
               </span>
-            </div>
-            <div className="flex flex-wrap gap-1.5">
+              <span className="text-[10px] text-pretty-wine-600 font-normal">
+                Toca para seleccionar
+              </span>
+            </label>
+
+            {/* Botón Disparador del Dropdown */}
+            <div className="relative">
               <button
                 type="button"
-                onClick={() => setSelectedProfId('all')}
-                className={`inline-flex items-center space-x-1 px-3 py-1.5 rounded-full text-xs font-semibold border transition-all ${
-                  selectedProfId === 'all'
-                    ? 'bg-pretty-wine-900 text-white border-pretty-wine-900 shadow-sm'
-                    : 'bg-white hover:bg-pretty-pink-50 text-pretty-wine-900 border-pretty-pink-200'
+                onClick={() => setIsProfDropdownOpen((prev) => !prev)}
+                className={`w-full p-2.5 rounded-2xl border text-left flex items-center justify-between transition-all shadow-xs ${
+                  isProfDropdownOpen
+                    ? 'bg-white border-pretty-wine-900 ring-2 ring-pretty-wine-900/10'
+                    : targetProfInfo.isAll
+                    ? 'bg-white/90 border-pretty-pink-200 hover:bg-white'
+                    : 'bg-white/90 border-pretty-wine-300 hover:bg-white'
                 }`}
               >
-                <Users className="w-3 h-3 text-pretty-pink-400" />
-                <span>Todas las esteticistas</span>
+                <div className="flex items-center space-x-2.5 min-w-0 pr-2">
+                  <div className={`w-8 h-8 rounded-xl flex items-center justify-center font-bold text-xs flex-shrink-0 ${
+                    targetProfInfo.isAll
+                      ? 'bg-pretty-pink-100 text-pretty-wine-900'
+                      : 'bg-pretty-wine-900 text-white'
+                  }`}>
+                    {targetProfInfo.isAll ? (
+                      <Users className="w-4 h-4 text-pretty-pink-600" />
+                    ) : (
+                      <span>{targetProfInfo.initials || 'ES'}</span>
+                    )}
+                  </div>
+
+                  <div className="min-w-0">
+                    <div className="flex items-center space-x-2">
+                      <span className="font-bold text-xs text-pretty-wine-950 truncate">
+                        {targetProfInfo.name}
+                      </span>
+                      <span className={`text-[9px] font-bold px-1.5 py-0.2 rounded-full uppercase tracking-wider ${
+                        targetProfInfo.isAll
+                          ? 'bg-pretty-pink-100 text-pretty-wine-800'
+                          : 'bg-pretty-wine-100 text-pretty-wine-900 border border-pretty-wine-300'
+                      }`}>
+                        {targetProfInfo.badge}
+                      </span>
+                    </div>
+                    <p className="text-[11px] text-pretty-wine-700/80 truncate mt-0.2">
+                      {targetProfInfo.subtitle}
+                    </p>
+                  </div>
+                </div>
+
+                <ChevronDown
+                  className={`w-4 h-4 text-pretty-wine-700 flex-shrink-0 transition-transform duration-200 ${
+                    isProfDropdownOpen ? 'rotate-180 text-pretty-wine-950' : ''
+                  }`}
+                />
               </button>
 
-              {professionals.map((p) => (
-                <button
-                  key={p.id}
-                  type="button"
-                  onClick={() => setSelectedProfId(p.id)}
-                  className={`inline-flex items-center space-x-1 px-3 py-1.5 rounded-full text-xs font-semibold border transition-all ${
-                    selectedProfId === p.id
-                      ? 'bg-pretty-wine-900 text-white border-pretty-wine-900 shadow-sm'
-                      : 'bg-white hover:bg-pretty-pink-50 text-pretty-wine-900 border-pretty-pink-200'
-                  }`}
-                >
-                  <span>{p.name}</span>
-                </button>
-              ))}
+              {/* Popover / Menú Desplegable */}
+              {isProfDropdownOpen && (
+                <div className="absolute left-0 right-0 top-full mt-1.5 bg-white rounded-2xl p-2.5 shadow-2xl border border-pretty-pink-200 z-50 animate-fade-in space-y-2">
+                  {/* Buscador dentro del dropdown si hay más de 2 */}
+                  {professionals.length > 2 && (
+                    <div className="relative">
+                      <Search className="w-3 h-3 absolute left-2.5 top-2.5 text-pretty-wine-500" />
+                      <input
+                        type="text"
+                        autoFocus
+                        placeholder="Buscar esteticista..."
+                        value={profSearchQuery}
+                        onChange={(e) => setProfSearchQuery(e.target.value)}
+                        className="w-full h-8 pl-7 pr-7 text-xs rounded-xl border border-pretty-pink-200 bg-pretty-pink-50/50 focus:bg-white focus:outline-none focus:ring-1 focus:ring-pretty-pink-400 text-pretty-wine-900"
+                      />
+                      {profSearchQuery && (
+                        <button
+                          type="button"
+                          onClick={() => setProfSearchQuery('')}
+                          className="absolute right-2 top-2 p-0.5 rounded-full text-pretty-wine-400 hover:text-pretty-wine-700 transition-colors"
+                        >
+                          <X className="w-3 h-3" />
+                        </button>
+                      )}
+                    </div>
+                  )}
+
+                  <div className="max-h-52 overflow-y-auto space-y-1.5 pr-0.5">
+                    {/* OPCIÓN: TODAS LAS ESTETICISTAS */}
+                    {!profSearchQuery && (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setSelectedProfId('all');
+                          setIsProfDropdownOpen(false);
+                          setProfSearchQuery('');
+                        }}
+                        className={`w-full p-2 rounded-xl text-left flex items-center justify-between transition-all border ${
+                          selectedProfId === 'all'
+                            ? 'bg-pretty-wine-900 text-white border-pretty-wine-900 shadow-xs'
+                            : 'bg-white hover:bg-pretty-pink-50 border-gray-100 hover:border-pretty-pink-200'
+                        }`}
+                      >
+                        <div className="flex items-center space-x-2.5 truncate">
+                          <div className={`w-7 h-7 rounded-lg flex items-center justify-center flex-shrink-0 ${
+                            selectedProfId === 'all' ? 'bg-white/20 text-white' : 'bg-pretty-pink-100 text-pretty-wine-800'
+                          }`}>
+                            <Users className="w-3.5 h-3.5" />
+                          </div>
+                          <div className="min-w-0">
+                            <div className="flex items-center space-x-1.5">
+                              <span className={`font-bold text-xs truncate ${
+                                selectedProfId === 'all' ? 'text-white' : 'text-pretty-wine-900'
+                              }`}>
+                                Todas las esteticistas
+                              </span>
+                              <span className={`text-[9px] font-semibold px-1.5 py-0.2 rounded-full ${
+                                selectedProfId === 'all' ? 'bg-white/20 text-white' : 'bg-pretty-pink-100 text-pretty-wine-800'
+                              }`}>
+                                Salón completo
+                              </span>
+                            </div>
+                            <p className={`text-[10px] truncate ${
+                              selectedProfId === 'all' ? 'text-white/80' : 'text-pretty-wine-600'
+                            }`}>
+                              Abre la jornada para todo el equipo en paralelo
+                            </p>
+                          </div>
+                        </div>
+                        {selectedProfId === 'all' && (
+                          <Check className="w-4 h-4 text-pretty-pink-300 flex-shrink-0 ml-2" />
+                        )}
+                      </button>
+                    )}
+
+                    {/* OPCIONES POR ESTETICISTA */}
+                    {filteredProfessionals.map((p) => {
+                      const isSelected = selectedProfId === p.id;
+                      return (
+                        <button
+                          type="button"
+                          key={p.id}
+                          onClick={() => {
+                            setSelectedProfId(p.id);
+                            setIsProfDropdownOpen(false);
+                            setProfSearchQuery('');
+                          }}
+                          className={`w-full p-2 rounded-xl text-left flex items-center justify-between transition-all border ${
+                            isSelected
+                              ? 'bg-pretty-wine-900 text-white border-pretty-wine-900 shadow-xs'
+                              : 'bg-white hover:bg-pretty-pink-50 border-gray-100 hover:border-pretty-pink-200 text-pretty-wine-900'
+                          }`}
+                        >
+                          <div className="flex items-center space-x-2.5 truncate">
+                            <div className={`w-7 h-7 rounded-lg flex items-center justify-center font-bold text-xs flex-shrink-0 ${
+                              isSelected ? 'bg-white/20 text-white' : 'bg-pretty-wine-100 text-pretty-wine-900'
+                            }`}>
+                              {p.name.slice(0, 2).toUpperCase()}
+                            </div>
+                            <div className="min-w-0">
+                              <div className="flex items-center space-x-1.5">
+                                <span className={`font-bold text-xs truncate ${
+                                  isSelected ? 'text-white' : 'text-pretty-wine-900'
+                                }`}>
+                                  {p.name}
+                                </span>
+                                <span className={`text-[9px] font-semibold px-1.5 py-0.2 rounded-full ${
+                                  isSelected ? 'bg-white/20 text-white' : 'bg-pretty-wine-100 text-pretty-wine-900'
+                                }`}>
+                                  Individual
+                                </span>
+                              </div>
+                              <p className={`text-[10px] truncate ${
+                                isSelected ? 'text-white/80' : 'text-pretty-wine-600'
+                              }`}>
+                                {p.title || 'Especialista'} · Abre jornada solo para {p.name}
+                              </p>
+                            </div>
+                          </div>
+                          {isSelected && (
+                            <Check className="w-4 h-4 text-pretty-pink-300 flex-shrink-0 ml-2" />
+                          )}
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
             </div>
           </div>
         )}
@@ -452,7 +669,7 @@ export function DayAvailabilityModal({
               <button
                 type="submit"
                 disabled={loading}
-                className="inline-flex items-center space-x-1 px-5 py-2 rounded-full text-xs font-bold text-white bg-pretty-wine-900 hover:bg-pretty-pink-600 shadow-sm transition-all active:scale-95"
+                className="inline-flex items-center space-x-1 px-5 py-2 rounded-full text-xs font-bold text-white bg-pretty-wine-900 hover:bg-pretty-pink-600 shadow-sm transition-all active:scale-95 disabled:opacity-50"
               >
                 <Unlock className="w-3.5 h-3.5" />
                 <span>{loading ? 'Guardando...' : 'Desbloquear Día'}</span>
@@ -535,7 +752,7 @@ export function DayAvailabilityModal({
                     <span>Rango listo: {presetLabels[activePreset] || 'Personalizado'}</span>
                   </div>
                   <p className="text-[11px] text-pretty-wine-800/80 mt-0.5">
-                    Del <strong>{batchStartDate}</strong> al <strong>{batchEndDate}</strong> para: <strong>{targetProfLabel}</strong>
+                    Del <strong>{batchStartDate}</strong> al <strong>{batchEndDate}</strong> para: <strong>{targetProfInfo.name}</strong>
                   </p>
                 </div>
 
