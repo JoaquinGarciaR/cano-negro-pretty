@@ -284,7 +284,8 @@ export default function AdminDashboardPage() {
 
     try {
       const targetB = bookings.find((b) => b.id === bookingId);
-      if (newStatus === 'CONFIRMED' && !targetB?.professionalId) {
+      const assignedProfId = targetB?.professionalId || targetB?.professional?.id;
+      if (newStatus === 'CONFIRMED' && !assignedProfId) {
         setActionError('Debes asignar una esteticista antes de poder confirmar la cita.');
         return;
       }

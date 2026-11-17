@@ -146,6 +146,7 @@ adminRouter.get('/bookings', async (req, res) => {
         modality: b.modality,
         locationName: b.locationDiscount?.name || null,
         customAddress: b.customAddress,
+        professionalId: b.professionalId,
         professional: b.professional,
         serviceName: b.snapshotServiceName,
         durationMinutes: b.snapshotDurationMinutes,
