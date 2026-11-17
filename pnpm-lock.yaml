@@ -11,6 +11,9 @@ importers:
       concurrently:
         specifier: ^8.2.2
         version: 8.2.2
+      next:
+        specifier: ^14.2.35
+        version: 14.2.35(@playwright/test@1.65.1)(react-dom@18.3.1(react@18.3.1))(react@18.3.1)
       typescript:
         specifier: ^5.3.3
         version: 5.9.3
@@ -47,6 +50,12 @@ importers:
       jsonwebtoken:
         specifier: ^9.0.2
         version: 9.0.3
+      prisma:
+        specifier: ^5.10.2
+        version: 5.22.0
+      typescript:
+        specifier: ^5.3.3
+        version: 5.9.3
       web-push:
         specifier: ^3.6.7
         version: 3.6.7
@@ -75,15 +84,9 @@ importers:
       '@types/web-push':
         specifier: ^3.6.3
         version: 3.6.4
-      prisma:
-        specifier: ^5.10.2
-        version: 5.22.0
       tsx:
         specifier: ^4.7.1
         version: 4.23.15
-      typescript:
-        specifier: ^5.3.3
-        version: 5.9.3
 
   apps/web:
     dependencies:
@@ -142,13 +145,12 @@ importers:
 
   packages/shared:
     dependencies:
-      zod:
-        specifier: ^3.22.4
-        version: 3.25.76
-    devDependencies:
       typescript:
         specifier: ^5.3.3
         version: 5.9.3
+      zod:
+        specifier: ^3.22.4
+        version: 3.25.76
 
 packages:
 

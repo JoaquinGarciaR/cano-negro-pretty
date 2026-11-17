@@ -344,6 +344,13 @@ export async function createManualBooking(input: CreateManualBookingInput, creat
     }).catch((e) => console.warn('Error push cita manual:', e));
   }
 
+  // Notificar también a las dueñas/administradoras en todos sus dispositivos
+  sendPushToOwners(business.id, {
+    title: 'Nueva Cita Manual Creada',
+    body: `Cita #${result.referenceCode} registrada para ${result.clientName} (${result.snapshotServiceName}).`,
+    url: '/admin'
+  }).catch((e) => console.warn('Error push dueña cita manual:', e));
+
   return result;
 }
 
@@ -433,6 +440,13 @@ export async function assignBooking(
     body: `Se te ha asignado la cita #${updated.referenceCode} con ${updated.clientName} (${updated.snapshotServiceName}).`,
     url: '/admin'
   }).catch((e) => console.warn('Error push asignación:', e));
+
+  // Notificar también a la administración/dueñas
+  sendPushToOwners(updated.businessId, {
+    title: 'Cita Asignada',
+    body: `Cita #${updated.referenceCode} (${updated.clientName}) asignada a ${updated.professional?.name}.`,
+    url: '/admin'
+  }).catch((e) => console.warn('Error push asignación dueñas:', e));
 
   return updated;
 }
@@ -528,18 +542,38 @@ export async function updateBookingStatus(
     return updated;
   });
 
-  if (status === BookingStatus.CANCELLED && updated.professionalId) {
-    sendPushToProfessional(updated.professionalId, {
+  if (status === BookingStatus.CANCELLED) {
+    if (updated.professionalId) {
+      sendPushToProfessional(updated.professionalId, {
+        title: 'Cita Cancelada',
+        body: `La cita #${updated.referenceCode} para ${updated.clientName} ha sido cancelada.`,
+        url: '/admin'
+      }).catch((e) => console.warn('Error push cancelación:', e));
+    }
+    sendPushToOwners(updated.businessId, {
       title: 'Cita Cancelada',
-      body: `La cita #${updated.referenceCode} para ${updated.clientName} ha sido cancelada.`,
+      body: `La cita #${updated.referenceCode} (${updated.clientName}) fue cancelada.`,
       url: '/admin'
-    }).catch((e) => console.warn('Error push cancelación:', e));
-  } else if (status === BookingStatus.CONFIRMED && updated.professionalId) {
-    sendPushToProfessional(updated.professionalId, {
+    }).catch((e) => console.warn('Error push cancelación dueñas:', e));
+  } else if (status === BookingStatus.CONFIRMED) {
+    if (updated.professionalId) {
+      sendPushToProfessional(updated.professionalId, {
+        title: 'Cita Confirmada',
+        body: `Cita #${updated.referenceCode} de ${updated.clientName} está confirmada.`,
+        url: '/admin'
+      }).catch((e) => console.warn('Error push confirmación:', e));
+    }
+    sendPushToOwners(updated.businessId, {
       title: 'Cita Confirmada',
-      body: `Cita #${updated.referenceCode} de ${updated.clientName} está confirmada.`,
+      body: `Cita #${updated.referenceCode}: ${updated.clientName} confirmada con ${updated.professional?.name}.`,
       url: '/admin'
-    }).catch((e) => console.warn('Error push confirmación:', e));
+    }).catch((e) => console.warn('Error push confirmación dueñas:', e));
+  } else if (status === BookingStatus.COMPLETED) {
+    sendPushToOwners(updated.businessId, {
+      title: 'Cita Completada',
+      body: `Cita #${updated.referenceCode} de ${updated.clientName} ha concluido con éxito.`,
+      url: '/admin'
+    }).catch((e) => console.warn('Error push completado dueñas:', e));
   }
 
   return updated;
