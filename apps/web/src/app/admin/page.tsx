@@ -580,6 +580,7 @@ export default function AdminDashboardPage() {
               <div className="space-y-3">
                 {pendingBookings.map((b) => {
                   const isUnassigned = !b.professional;
+                  const assignedProfId = b.professionalId || b.professional?.id;
                   const canSelfAssign = currentUser?.professional?.id && (isUnassigned || b.professional?.id !== currentUser.professional.id);
 
                   return (
@@ -622,7 +623,7 @@ export default function AdminDashboardPage() {
                             ) : (
                               <span className="inline-flex items-center space-x-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-pretty-pink-100 text-pretty-wine-900 border border-pretty-pink-200">
                                 <User className="w-3 h-3 text-pretty-pink-600" />
-                                <span>Asignada a: {b.professional.name}</span>
+                                <span>Asignada a: {b.professional?.name || 'Esteticista'} (Pendiente de aceptar)</span>
                               </span>
                             )}
                           </div>
@@ -778,7 +779,13 @@ export default function AdminDashboardPage() {
                             }`}
                           >
                             <CheckCircle2 className="w-3.5 h-3.5" />
-                            <span>{isUnassigned ? 'Requiere Asignar' : 'Confirmar Cita'}</span>
+                            <span>
+                              {isUnassigned
+                                ? 'Requiere Asignar'
+                                : currentUser?.professional?.id === assignedProfId
+                                ? 'Aceptar y Confirmar Cita'
+                                : 'Confirmar Cita'}
+                            </span>
                           </button>
                         </div>
                       </div>
@@ -1492,7 +1499,7 @@ export default function AdminDashboardPage() {
         activeTab={activeTab}
         onSuccess={() => {
           loadData();
-          setActionSuccess('Cita manual registrada y asignada correctamente.');
+          setActionSuccess('Cita manual registrada. Si fue asignada a una compañera, aparecerá como pendiente hasta que ella la acepte y confirme.');
         }}
       />
 

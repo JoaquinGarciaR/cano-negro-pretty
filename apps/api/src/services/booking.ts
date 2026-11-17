@@ -285,6 +285,19 @@ export async function createManualBooking(input: CreateManualBookingInput, creat
       codeExists = await tx.booking.findUnique({ where: { referenceCode } });
     }
 
+    // Comprobar si la persona que crea la cita es la misma profesional asignada
+    const creatorUser = createdByUserId
+      ? await tx.user.findUnique({ where: { id: createdByUserId } })
+      : null;
+
+    // Si alguien le crea una cita a otra persona (ej. la dueña a una estilista o una estilista a su compañera),
+    // dicha persona tendrá que aceptarla: aparecerá asignada pero en estado PENDING hasta que la persona asignada
+    // confirme que puede tomarla y envíe el mensaje por WhatsApp.
+    const isSelfAssigned = Boolean(
+      creatorUser?.professionalId && creatorUser.professionalId === professionalId
+    );
+    const initialStatus = isSelfAssigned ? BookingStatus.CONFIRMED : BookingStatus.PENDING;
+
     const booking = await tx.booking.create({
       data: {
         referenceCode,
@@ -305,9 +318,9 @@ export async function createManualBooking(input: CreateManualBookingInput, creat
         snapshotTotalCRC: totalCRC,
         startTime,
         endTime,
-        status: BookingStatus.CONFIRMED,
+        status: initialStatus,
         clientNotes: clientNotes || null,
-        staffNotes: staffNotes || 'Cita ingresada manualmente por personal'
+        staffNotes: staffNotes || (isSelfAssigned ? 'Cita ingresada manualmente por personal' : 'Cita asignada por administración pendiente de confirmación')
       },
       include: {
         professional: true,
@@ -320,7 +333,9 @@ export async function createManualBooking(input: CreateManualBookingInput, creat
         bookingId: booking.id,
         userId: createdByUserId || null,
         action: 'MANUAL_BOOKING_CREATED',
-        details: `Cita creada manualmente y asignada a ${booking.professional?.name}.`
+        details: isSelfAssigned
+          ? `Cita creada manualmente y auto-asignada por ${booking.professional?.name}.`
+          : `Cita creada por ${creatorUser?.name || 'Administración'} y asignada a ${booking.professional?.name} (Pendiente de aceptación).`
       }
     });
 
@@ -328,8 +343,10 @@ export async function createManualBooking(input: CreateManualBookingInput, creat
       data: {
         businessId: business.id,
         professionalId,
-        title: 'Cita asignada a tu agenda',
-        message: `Te han asignado la cita #${booking.referenceCode} para ${clientName}.`,
+        title: isSelfAssigned ? 'Cita asignada a tu agenda' : 'Nueva cita asignada a tu agenda (Pendiente de aceptación)',
+        message: isSelfAssigned
+          ? `Has registrado la cita #${booking.referenceCode} para ${clientName}.`
+          : `${creatorUser?.name || 'Administración'} te ha asignado la cita #${booking.referenceCode} para ${clientName}. Ingresa para aceptarla y confirmarla.`,
         bookingId: booking.id
       }
     });
@@ -338,9 +355,12 @@ export async function createManualBooking(input: CreateManualBookingInput, creat
   });
 
   if (result.professionalId) {
+    const isPendingAcceptance = result.status === BookingStatus.PENDING;
     sendPushToProfessional(result.professionalId, {
-      title: 'Cita en tu Agenda',
-      body: `Te han asignado la cita #${result.referenceCode} para ${result.clientName} (${result.snapshotServiceName}).`,
+      title: isPendingAcceptance ? 'Nueva Cita Pendiente de Aceptación' : 'Cita en tu Agenda',
+      body: isPendingAcceptance
+        ? `Te han asignado la cita #${result.referenceCode} para ${result.clientName}. Revisa tu bandeja para aceptarla y confirmarla.`
+        : `Te han asignado la cita #${result.referenceCode} para ${result.clientName} (${result.snapshotServiceName}).`,
       url: '/admin'
     }).catch((e) => console.warn('Error push cita manual:', e));
   }
