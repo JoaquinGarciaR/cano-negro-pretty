@@ -11,7 +11,8 @@ import {
   Ban,
   UserCheck,
   XCircle,
-  Check
+  Check,
+  Bell
 } from 'lucide-react';
 
 export type WhatsAppTemplateType = 'confirmation' | 'reschedule' | 'reminder' | 'cancellation' | 'completed';
@@ -227,8 +228,36 @@ export function BookingActionMenu({
               </button>
             )}
 
-            {/* OPCIÓN 3: Enviar WhatsApp */}
-            {onWhatsApp && (
+            {/* OPCIÓN 3: Enviar Recordatorio o Confirmación por WhatsApp */}
+            {isConfirmed && onWhatsApp && (
+              <>
+                <button
+                  type="button"
+                  onClick={() => {
+                    closeMenu();
+                    onWhatsApp(booking, 'reminder');
+                  }}
+                  className="w-full flex items-center space-x-2 px-2.5 py-1.5 rounded-xl text-xs font-semibold hover:bg-amber-50 text-pretty-wine-900 transition-colors text-left"
+                >
+                  <Bell className="w-3.5 h-3.5 text-amber-500 flex-shrink-0" />
+                  <span>Enviar Recordatorio</span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => {
+                    closeMenu();
+                    onWhatsApp(booking, 'confirmation');
+                  }}
+                  className="w-full flex items-center space-x-2 px-2.5 py-1.5 rounded-xl text-xs font-semibold hover:bg-pretty-pink-50 text-pretty-wine-900 transition-colors text-left"
+                >
+                  <MessageSquare className="w-3.5 h-3.5 text-emerald-600 flex-shrink-0" />
+                  <span>Reenviar Confirmación</span>
+                </button>
+              </>
+            )}
+
+            {!isConfirmed && onWhatsApp && (
               <button
                 type="button"
                 onClick={() => {
@@ -242,14 +271,22 @@ export function BookingActionMenu({
                 }}
                 className="w-full flex items-center space-x-2 px-2.5 py-1.5 rounded-xl text-xs font-semibold hover:bg-pretty-pink-50 text-pretty-wine-900 transition-colors text-left"
               >
-                <MessageSquare className="w-3.5 h-3.5 text-emerald-600 flex-shrink-0" />
-                <span>
-                  {isCompleted
-                    ? 'Agradecimiento WhatsApp'
-                    : isCancelled || isRejected
-                    ? 'Notificar cancelación'
-                    : 'Enviar WhatsApp'}
-                </span>
+                {isCompleted ? (
+                  <>
+                    <Sparkles className="w-3.5 h-3.5 text-pretty-pink-500 flex-shrink-0" />
+                    <span>Agradecimiento WhatsApp</span>
+                  </>
+                ) : isCancelled || isRejected ? (
+                  <>
+                    <MessageSquare className="w-3.5 h-3.5 text-rose-600 flex-shrink-0" />
+                    <span>Notificar cancelación</span>
+                  </>
+                ) : (
+                  <>
+                    <MessageSquare className="w-3.5 h-3.5 text-emerald-600 flex-shrink-0" />
+                    <span>WhatsApp de Confirmación</span>
+                  </>
+                )}
               </button>
             )}
 
