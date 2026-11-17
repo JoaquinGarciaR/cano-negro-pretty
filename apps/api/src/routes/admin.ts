@@ -280,7 +280,7 @@ adminRouter.get('/availability', async (req, res) => {
     const user = req.user!;
     const targetProfId = user.role === 'STAFF' && user.professionalId
       ? user.professionalId
-      : (typeof professionalId === 'string' ? professionalId : undefined);
+      : (typeof professionalId === 'string' && professionalId !== 'ALL' && professionalId !== 'undefined' && professionalId !== 'null' && professionalId.trim() !== '' ? professionalId.trim() : undefined);
 
     const availabilities = await prisma.dayAvailability.findMany({
       where: targetProfId ? { professionalId: targetProfId } : {},

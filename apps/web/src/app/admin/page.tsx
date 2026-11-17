@@ -125,6 +125,9 @@ export default function AdminDashboardPage() {
   const [isLocationsOpen, setIsLocationsOpen] = useState<boolean>(false);
   const [isPushModalOpen, setIsPushModalOpen] = useState<boolean>(false);
   const [selectedDateForAvail, setSelectedDateForAvail] = useState<string | undefined>(undefined);
+  const [availabilityMonth, setAvailabilityMonth] = useState<Date>(new Date());
+  const [availabilityViewMode, setAvailabilityViewMode] = useState<'calendar' | 'list'>('calendar');
+  const [availabilityModalMode, setAvailabilityModalMode] = useState<'single' | 'batch'>('single');
 
   // Retroalimentación de acciones
   const [actionError, setActionError] = useState<string | null>(null);
@@ -1425,7 +1428,7 @@ export default function AdminDashboardPage() {
                 </p>
               </div>
 
-              <div className="flex items-center space-x-2">
+              <div className="flex items-center space-x-2 flex-wrap gap-y-2">
                 {currentUser?.role === 'OWNER' && (
                   <StylistDropdown
                     value={filterProfessionalId}
@@ -1442,8 +1445,24 @@ export default function AdminDashboardPage() {
                 )}
 
                 <button
+                  type="button"
                   onClick={() => {
                     setSelectedDateForAvail(undefined);
+                    setAvailabilityModalMode('batch');
+                    setIsDayAvailOpen(true);
+                  }}
+                  className="inline-flex items-center space-x-1.5 px-3.5 py-1.5 rounded-full text-xs font-bold text-white bg-pretty-pink-600 hover:bg-pretty-wine-900 transition-all shadow-sm active:scale-95 flex-shrink-0"
+                  title="Abrir 1 mes completo o rango de fechas"
+                >
+                  <Sparkles className="w-3.5 h-3.5 text-pretty-pink-200" />
+                  <span>Extender Agenda 1 Mes</span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => {
+                    setSelectedDateForAvail(undefined);
+                    setAvailabilityModalMode('single');
                     setIsDayAvailOpen(true);
                   }}
                   className="inline-flex items-center space-x-1 px-3.5 py-1.5 rounded-full text-xs font-bold text-white bg-pretty-wine-900 hover:bg-pretty-pink-600 transition-all shadow-sm flex-shrink-0"
@@ -1454,75 +1473,290 @@ export default function AdminDashboardPage() {
               </div>
             </div>
 
-            {/* Listado de fechas próximas (próximos 21 días) */}
-            <div className="space-y-2">
-              {Array.from({ length: 21 }).map((_, i) => {
-                const d = new Date();
-                d.setDate(d.getDate() + i);
-                const dateStr = d.toISOString().split('T')[0];
-                const avail = availabilities.find(
-                  (a) =>
-                    a.date === dateStr &&
-                    (!filterProfessionalId || a.professionalId === filterProfessionalId)
-                );
-                const isOpen = avail?.isOpen === true;
+            {/* Barra de Navegación Mensual y Selector de Vista */}
+            <div className="glass-panel rounded-2xl p-3 sm:p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+              
+              {/* Controles de Navegación de Mes */}
+              <div className="flex items-center space-x-2">
+                <div className="flex items-center space-x-1">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const prev = new Date(availabilityMonth);
+                      prev.setMonth(prev.getMonth() - 1);
+                      setAvailabilityMonth(prev);
+                    }}
+                    className="p-1.5 rounded-lg bg-white/80 hover:bg-white text-pretty-wine-900 shadow-sm border border-pretty-pink-200/60"
+                    title="Mes anterior"
+                  >
+                    <ChevronLeft className="w-4 h-4" />
+                  </button>
 
-                const dayLabel = d.toLocaleDateString('es-CR', {
-                  weekday: 'long',
-                  day: 'numeric',
-                  month: 'long',
-                  year: 'numeric'
-                });
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const next = new Date(availabilityMonth);
+                      next.setMonth(next.getMonth() + 1);
+                      setAvailabilityMonth(next);
+                    }}
+                    className="p-1.5 rounded-lg bg-white/80 hover:bg-white text-pretty-wine-900 shadow-sm border border-pretty-pink-200/60"
+                    title="Mes siguiente"
+                  >
+                    <ChevronRight className="w-4 h-4" />
+                  </button>
+                </div>
 
-                return (
-                  <div
-                    key={dateStr}
-                    className={`glass-panel rounded-2xl p-3 sm:p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-2 border transition-all ${
-                      isOpen
-                        ? 'border-pretty-pink-300 bg-white/80'
-                        : 'border-white/60 bg-white/40 opacity-70'
+                <div className="flex items-center space-x-2 pl-1">
+                  <Calendar className="w-4 h-4 text-pretty-pink-500" />
+                  <span className="font-serif text-base sm:text-lg font-bold text-pretty-wine-900 capitalize">
+                    {availabilityMonth.toLocaleDateString('es-CR', { month: 'long', year: 'numeric' })}
+                  </span>
+                </div>
+              </div>
+
+              {/* Accesos rápidos a meses y alternador de vista */}
+              <div className="flex items-center justify-between sm:justify-end gap-2 flex-wrap">
+                <div className="flex items-center space-x-1">
+                  {[
+                    { label: 'Nov 2026', y: 2026, m: 10 },
+                    { label: 'Dic 2026', y: 2026, m: 11 },
+                    { label: 'Ene 2027', y: 2027, m: 0 }
+                  ].map((p) => {
+                    const isCurrent =
+                      availabilityMonth.getFullYear() === p.y &&
+                      availabilityMonth.getMonth() === p.m;
+
+                    return (
+                      <button
+                        key={p.label}
+                        type="button"
+                        onClick={() => setAvailabilityMonth(new Date(p.y, p.m, 1))}
+                        className={`text-[11px] px-2.5 py-1 rounded-full font-semibold border transition-all ${
+                          isCurrent
+                            ? 'bg-pretty-wine-900 text-white border-pretty-wine-900 shadow-2xs'
+                            : 'bg-white/80 text-pretty-wine-900 border-pretty-pink-200/80 hover:bg-white'
+                        }`}
+                      >
+                        {p.label}
+                      </button>
+                    );
+                  })}
+                </div>
+
+                <div className="flex items-center space-x-0.5 p-1 rounded-2xl bg-pretty-pink-100/70 border border-pretty-pink-200/60">
+                  <button
+                    type="button"
+                    onClick={() => setAvailabilityViewMode('calendar')}
+                    className={`inline-flex items-center space-x-1 px-2.5 py-1 rounded-xl text-xs font-bold transition-all ${
+                      availabilityViewMode === 'calendar'
+                        ? 'bg-pretty-wine-900 text-white shadow-sm'
+                        : 'text-pretty-wine-900 hover:bg-white/60'
                     }`}
                   >
-                    <div>
-                      <div className="flex flex-wrap items-center gap-1.5">
-                        <span className="font-serif text-xs sm:text-sm font-bold text-pretty-wine-900 capitalize">
-                          {dayLabel}
-                        </span>
-                        {isOpen ? (
-                          <span className="inline-flex items-center space-x-1 px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-emerald-100 text-emerald-800 border border-emerald-200 flex-shrink-0">
-                            <Unlock className="w-3 h-3 text-emerald-600" />
-                            <span>Desbloqueado ({avail.startTime} – {avail.endTime})</span>
-                          </span>
-                        ) : (
-                          <span className="inline-flex items-center space-x-1 px-2.5 py-0.5 rounded-full text-[10px] font-semibold bg-gray-100 text-gray-600 border border-gray-200 flex-shrink-0">
-                            <Lock className="w-3 h-3 text-gray-500" />
-                            <span>Bloqueado</span>
-                          </span>
-                        )}
-                      </div>
-                      {avail?.customNote && (
-                        <p className="text-[11px] text-pretty-wine-700/80 mt-0.5">
-                          Nota: {avail.customNote}
-                        </p>
-                      )}
-                    </div>
+                    <Calendar className="w-3 h-3" />
+                    <span>Calendario</span>
+                  </button>
 
-                    <div className="flex items-center space-x-2 justify-end">
-                      <button
-                        onClick={() => {
-                          setSelectedDateForAvail(dateStr);
-                          setIsDayAvailOpen(true);
-                        }}
-                        className="inline-flex items-center space-x-1 px-3 py-1.5 rounded-full text-xs font-semibold bg-white hover:bg-pretty-pink-50 text-pretty-wine-900 border border-pretty-pink-200 shadow-sm"
-                      >
-                        <Settings2 className="w-3.5 h-3.5 text-pretty-pink-500" />
-                        <span>{isOpen ? 'Modificar Horario' : 'Desbloquear'}</span>
-                      </button>
-                    </div>
-                  </div>
-                );
-              })}
+                  <button
+                    type="button"
+                    onClick={() => setAvailabilityViewMode('list')}
+                    className={`inline-flex items-center space-x-1 px-2.5 py-1 rounded-xl text-xs font-bold transition-all ${
+                      availabilityViewMode === 'list'
+                        ? 'bg-pretty-wine-900 text-white shadow-sm'
+                        : 'text-pretty-wine-900 hover:bg-white/60'
+                    }`}
+                  >
+                    <ListFilter className="w-3 h-3" />
+                    <span>Lista</span>
+                  </button>
+                </div>
+              </div>
             </div>
+
+            {/* VISTA 1: CALENDARIO MENSUAL DE APERTURA */}
+            {availabilityViewMode === 'calendar' && (() => {
+              const year = availabilityMonth.getFullYear();
+              const month = availabilityMonth.getMonth();
+              const firstDayOfWeek = new Date(year, month, 1).getDay();
+              const totalDaysInMonth = new Date(year, month + 1, 0).getDate();
+
+              return (
+                <div className="glass-panel rounded-3xl p-4 sm:p-5 shadow-glass space-y-3">
+                  {/* Cabecera de días de la semana */}
+                  <div className="grid grid-cols-7 gap-1 text-center text-[10px] font-bold uppercase text-pretty-wine-700/70 py-1">
+                    <span>Dom</span>
+                    <span>Lun</span>
+                    <span>Mar</span>
+                    <span>Mié</span>
+                    <span>Jue</span>
+                    <span>Vie</span>
+                    <span>Sáb</span>
+                  </div>
+
+                  {/* Cuadrícula de Días */}
+                  <div className="grid grid-cols-7 gap-1.5 sm:gap-2">
+                    {/* Celdas vacías iniciales */}
+                    {Array.from({ length: firstDayOfWeek }).map((_, i) => (
+                      <div key={`empty-avail-${i}`} className="min-h-[58px] sm:min-h-[72px] rounded-2xl bg-white/10" />
+                    ))}
+
+                    {/* Días del mes */}
+                    {Array.from({ length: totalDaysInMonth }).map((_, i) => {
+                      const dayNum = i + 1;
+                      const dateStr = `${year}-${String(month + 1).padStart(2, '0')}-${String(dayNum).padStart(2, '0')}`;
+                      
+                      const matchingAvails = availabilities.filter(
+                        (a) =>
+                          a.date === dateStr &&
+                          (!filterProfessionalId || filterProfessionalId === 'ALL' || a.professionalId === filterProfessionalId)
+                      );
+                      const openAvail = matchingAvails.find((a) => a.isOpen);
+                      const isOpen = Boolean(openAvail);
+                      const avail = openAvail || matchingAvails[0];
+
+                      return (
+                        <button
+                          key={dateStr}
+                          type="button"
+                          onClick={() => {
+                            setSelectedDateForAvail(dateStr);
+                            setAvailabilityModalMode('single');
+                            setIsDayAvailOpen(true);
+                          }}
+                          className={`min-h-[58px] sm:min-h-[72px] p-1.5 sm:p-2 rounded-2xl border text-left flex flex-col justify-between transition-all group relative ${
+                            isOpen
+                              ? 'bg-white/90 border-pretty-pink-300 hover:border-pretty-pink-500 shadow-xs'
+                              : 'bg-white/35 border-white/60 hover:bg-white/60 opacity-60'
+                          }`}
+                        >
+                          <div className="flex items-center justify-between w-full">
+                            <span className="font-serif text-xs sm:text-sm font-bold text-pretty-wine-900">
+                              {dayNum}
+                            </span>
+                            {isOpen ? (
+                              <Unlock className="w-3 h-3 text-emerald-600 flex-shrink-0" />
+                            ) : (
+                              <Lock className="w-2.5 h-2.5 text-gray-400 flex-shrink-0" />
+                            )}
+                          </div>
+
+                          <div className="mt-1">
+                            {isOpen ? (
+                              <span className="inline-block px-1.5 py-0.5 rounded-md text-[9px] font-bold bg-emerald-100 text-emerald-900 border border-emerald-200 truncate w-full">
+                                {avail.startTime} - {avail.endTime}
+                              </span>
+                            ) : (
+                              <span className="text-[9px] text-gray-400 block truncate">
+                                Cerrado
+                              </span>
+                            )}
+                          </div>
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+              );
+            })()}
+
+            {/* VISTA 2: LISTADO DE DÍAS DEL MES */}
+            {availabilityViewMode === 'list' && (() => {
+              const year = availabilityMonth.getFullYear();
+              const month = availabilityMonth.getMonth();
+              const totalDaysInMonth = new Date(year, month + 1, 0).getDate();
+
+              return (
+                <div className="space-y-2">
+                  {Array.from({ length: totalDaysInMonth }).map((_, i) => {
+                    const dayNum = i + 1;
+                    const dateStr = `${year}-${String(month + 1).padStart(2, '0')}-${String(dayNum).padStart(2, '0')}`;
+                    const d = new Date(year, month, dayNum, 12, 0, 0);
+
+                    const matchingAvails = availabilities.filter(
+                      (a) =>
+                        a.date === dateStr &&
+                        (!filterProfessionalId || filterProfessionalId === 'ALL' || a.professionalId === filterProfessionalId)
+                    );
+                    const openAvail = matchingAvails.find((a) => a.isOpen);
+                    const isOpen = Boolean(openAvail);
+                    const avail = openAvail || matchingAvails[0];
+
+                    const dayLabel = d.toLocaleDateString('es-CR', {
+                      weekday: 'long',
+                      day: 'numeric',
+                      month: 'long',
+                      year: 'numeric'
+                    });
+
+                    return (
+                      <div
+                        key={dateStr}
+                        className={`glass-panel rounded-2xl p-3 sm:p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-2 border transition-all ${
+                          isOpen
+                            ? 'border-pretty-pink-300 bg-white/90 shadow-xs'
+                            : 'border-white/60 bg-white/40 opacity-70'
+                        }`}
+                      >
+                        <div>
+                          <div className="flex flex-wrap items-center gap-1.5">
+                            <span className="font-serif text-xs sm:text-sm font-bold text-pretty-wine-900 capitalize">
+                              {dayLabel}
+                            </span>
+                            {isOpen ? (
+                              <span className="inline-flex items-center space-x-1 px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-emerald-100 text-emerald-800 border border-emerald-200 flex-shrink-0">
+                                <Unlock className="w-3 h-3 text-emerald-600" />
+                                <span>Desbloqueado ({avail.startTime} – {avail.endTime})</span>
+                              </span>
+                            ) : (
+                              <span className="inline-flex items-center space-x-1 px-2.5 py-0.5 rounded-full text-[10px] font-semibold bg-gray-100 text-gray-600 border border-gray-200 flex-shrink-0">
+                                <Lock className="w-3 h-3 text-gray-500" />
+                                <span>Bloqueado</span>
+                              </span>
+                            )}
+                          </div>
+                          {avail?.customNote && (
+                            <p className="text-[11px] text-pretty-wine-700/80 mt-0.5">
+                              Nota: {avail.customNote}
+                            </p>
+                          )}
+                        </div>
+
+                        <div className="flex items-center space-x-2 justify-end">
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setSelectedDateForAvail(dateStr);
+                              setAvailabilityModalMode('single');
+                              setIsDayAvailOpen(true);
+                            }}
+                            className="inline-flex items-center space-x-1 px-3 py-1.5 rounded-full text-xs font-semibold bg-white hover:bg-pretty-pink-50 text-pretty-wine-900 border border-pretty-pink-200 shadow-sm"
+                          >
+                            <Settings2 className="w-3.5 h-3.5 text-pretty-pink-500" />
+                            <span>{isOpen ? 'Modificar Horario' : 'Desbloquear'}</span>
+                          </button>
+                        </div>
+                      </div>
+                    );
+                  })}
+
+                  {/* Botón para avanzar de mes en la lista */}
+                  <div className="pt-2 flex justify-center">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const next = new Date(availabilityMonth);
+                        next.setMonth(next.getMonth() + 1);
+                        setAvailabilityMonth(next);
+                      }}
+                      className="inline-flex items-center space-x-1.5 px-4 py-2 rounded-full text-xs font-bold bg-white hover:bg-pretty-pink-50 text-pretty-wine-900 border border-pretty-pink-200 shadow-sm transition-all"
+                    >
+                      <span>Ver días del siguiente mes</span>
+                      <ChevronRight className="w-3.5 h-3.5 text-pretty-pink-500" />
+                    </button>
+                  </div>
+                </div>
+              );
+            })()}
 
           </div>
         )}
@@ -1599,11 +1833,13 @@ export default function AdminDashboardPage() {
       <DayAvailabilityModal
         isOpen={isDayAvailOpen}
         onClose={() => setIsDayAvailOpen(false)}
-        professionalId={filterProfessionalId || catalog?.professionals[0]?.id || 'prof_elena'}
+        professionalId={filterProfessionalId && filterProfessionalId !== 'ALL' ? filterProfessionalId : undefined}
         professionalName={
-          catalog?.professionals.find((p: any) => p.id === (filterProfessionalId || catalog?.professionals[0]?.id))?.name || 'Esteticista'
+          catalog?.professionals.find((p: any) => p.id === filterProfessionalId)?.name || 'Todas las esteticistas'
         }
+        professionals={catalog?.professionals || []}
         initialDate={selectedDateForAvail}
+        initialMode={availabilityModalMode}
         token={authToken}
         onSuccess={loadData}
       />
