@@ -4,8 +4,7 @@
   "private": true,
   "packageManager": "pnpm@9.15.4",
   "engines": {
-    "node": "20.x",
-    "pnpm": "9.15.4"
+    "node": ">=20.0.0"
   },
   "description": "Sistema de reservas y backoffice PWA para Caño Negro Pretty",
   "scripts": {
