@@ -263,7 +263,7 @@ export default function AdminDashboardPage() {
     setActionSuccess(null);
 
     try {
-      const res = await assignBookingApi(bookingId, profId, authToken);
+      const res = await assignBookingApi(bookingId, profId, undefined, authToken);
       const targetBooking = bookings.find((b) => b.id === bookingId);
       const profName = catalog?.professionals?.find((p: any) => p.id === profId)?.name || 'Especialista';
 
@@ -690,7 +690,7 @@ export default function AdminDashboardPage() {
                           )}
 
                           <select
-                            defaultValue=""
+                            value=""
                             onChange={(e) => {
                               if (e.target.value) {
                                 handleAssignBooking(b.id, e.target.value);
@@ -701,11 +701,26 @@ export default function AdminDashboardPage() {
                             <option value="" disabled>
                               {isUnassigned ? 'Asignar a especialista...' : 'Reasignar a...'}
                             </option>
-                            {catalog?.professionals?.map((p: any) => (
-                              <option key={p.id} value={p.id}>
-                                {p.name}
-                              </option>
-                            ))}
+                            {catalog?.professionals?.map((p: any) => {
+                              // Verificar si esta profesional ya tiene una cita confirmada en este intervalo
+                              const hasConflict = bookings.some((other) => {
+                                if (other.id === b.id || other.status !== 'CONFIRMED') return false;
+                                const otherProfId = other.professionalId || other.professional?.id;
+                                if (otherProfId !== p.id) return false;
+                                return (
+                                  new Date(b.startTime) < new Date(other.endTime) &&
+                                  new Date(b.endTime) > new Date(other.startTime)
+                                );
+                              });
+
+                              const isCurrentAssigned = (b.professionalId || b.professional?.id) === p.id;
+
+                              return (
+                                <option key={p.id} value={p.id} disabled={hasConflict}>
+                                  {p.name} {hasConflict ? '(Ocupada en este horario)' : isCurrentAssigned ? '(Asignada actual)' : ''}
+                                </option>
+                              );
+                            })}
                           </select>
                         </div>
 
