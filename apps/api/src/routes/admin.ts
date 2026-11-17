@@ -743,6 +743,183 @@ adminRouter.delete('/services/:id', async (req, res) => {
 });
 
 // =========================================================================
+// GESTIÓN DE PAQUETES Y SERVICIOS COMBINADOS (COMBOS)
+// =========================================================================
+
+/**
+ * Listar todos los paquetes combinados
+ */
+adminRouter.get('/packages', async (req, res) => {
+  try {
+    const packages = await prisma.package.findMany({
+      where: { businessId: req.user!.businessId },
+      include: {
+        components: {
+          include: { service: true }
+        }
+      },
+      orderBy: { name: 'asc' }
+    });
+
+    const formatted = packages.map((p) => {
+      const componentsSum = p.components.reduce((sum, c) => sum + (c.service?.priceCRC || 0), 0);
+      return {
+        id: p.id,
+        name: p.name,
+        description: p.description,
+        imageUrl: p.imageUrl,
+        componentServiceIds: p.components.map((c) => c.serviceId),
+        components: p.components.map((c) => c.service),
+        extraPriceCRC: p.extraPriceCRC,
+        componentsSumCRC: componentsSum,
+        totalPriceCRC: Math.max(0, componentsSum + p.extraPriceCRC),
+        totalDurationBlocks: p.totalDurationBlocks,
+        totalDurationMinutes: p.totalDurationBlocks * 15,
+        active: p.active
+      };
+    });
+
+    res.json({ packages: formatted });
+  } catch (error: any) {
+    res.status(500).json({ error: error.message || 'Error al listar paquetes' });
+  }
+});
+
+/**
+ * Crear un nuevo paquete combinado
+ */
+adminRouter.post('/packages', async (req, res) => {
+  try {
+    const { name, description, imageUrl, componentServiceIds, extraPriceCRC, totalDurationBlocks } = req.body;
+    if (!name || !Array.isArray(componentServiceIds) || componentServiceIds.length < 2) {
+      return res.status(400).json({ error: 'Un servicio combinado debe tener nombre y al menos 2 servicios incluidos' });
+    }
+
+    const services = await prisma.service.findMany({
+      where: { id: { in: componentServiceIds } }
+    });
+    const calculatedBlocks = totalDurationBlocks || services.reduce((sum, s) => sum + s.durationBlocks, 0);
+
+    const id = `pkg_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`;
+    const pkg = await prisma.package.create({
+      data: {
+        id,
+        businessId: req.user!.businessId,
+        name: name.trim(),
+        description: (description || '').trim(),
+        imageUrl: imageUrl || 'https://images.unsplash.com/photo-1516975080664-ed2fc6a32937?auto=format&fit=crop&w=600&q=80',
+        extraPriceCRC: Number(extraPriceCRC || 0),
+        totalDurationBlocks: Number(calculatedBlocks),
+        active: true,
+        components: {
+          create: componentServiceIds.map((sId: string) => ({
+            service: { connect: { id: sId } }
+          }))
+        }
+      },
+      include: {
+        components: { include: { service: true } }
+      }
+    });
+
+    res.status(201).json({ message: 'Servicio combinado creado exitosamente', package: pkg });
+  } catch (error: any) {
+    res.status(500).json({ error: error.message || 'Error al crear servicio combinado' });
+  }
+});
+
+/**
+ * Actualizar un paquete combinado existente
+ */
+adminRouter.put('/packages/:id', async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { name, description, imageUrl, componentServiceIds, extraPriceCRC, totalDurationBlocks } = req.body;
+
+    const existing = await prisma.package.findUnique({ where: { id } });
+    if (!existing || existing.businessId !== req.user!.businessId) {
+      return res.status(404).json({ error: 'Servicio combinado no encontrado' });
+    }
+
+    if (Array.isArray(componentServiceIds) && componentServiceIds.length > 0) {
+      await prisma.packageService.deleteMany({ where: { packageId: id } });
+    }
+
+    const services = Array.isArray(componentServiceIds) && componentServiceIds.length > 0
+      ? await prisma.service.findMany({ where: { id: { in: componentServiceIds } } })
+      : [];
+    const calculatedBlocks = totalDurationBlocks || (services.length > 0 ? services.reduce((sum, s) => sum + s.durationBlocks, 0) : existing.totalDurationBlocks);
+
+    const updated = await prisma.package.update({
+      where: { id },
+      data: {
+        name: name ? name.trim() : existing.name,
+        description: description !== undefined ? description.trim() : existing.description,
+        imageUrl: imageUrl || existing.imageUrl,
+        extraPriceCRC: extraPriceCRC !== undefined ? Number(extraPriceCRC) : existing.extraPriceCRC,
+        totalDurationBlocks: Number(calculatedBlocks),
+        components: Array.isArray(componentServiceIds) && componentServiceIds.length > 0 ? {
+          create: componentServiceIds.map((sId: string) => ({
+            service: { connect: { id: sId } }
+          }))
+        } : undefined
+      },
+      include: {
+        components: { include: { service: true } }
+      }
+    });
+
+    res.json({ message: 'Servicio combinado actualizado exitosamente', package: updated });
+  } catch (error: any) {
+    res.status(500).json({ error: error.message || 'Error al actualizar servicio combinado' });
+  }
+});
+
+/**
+ * Alternar estado activo / inactivo de un paquete combinado
+ */
+adminRouter.patch('/packages/:id/toggle', async (req, res) => {
+  try {
+    const { id } = req.params;
+    const existing = await prisma.package.findUnique({ where: { id } });
+    if (!existing || existing.businessId !== req.user!.businessId) {
+      return res.status(404).json({ error: 'Servicio combinado no encontrado' });
+    }
+    const updated = await prisma.package.update({
+      where: { id },
+      data: { active: !existing.active }
+    });
+    res.json({ message: `Servicio combinado ${updated.active ? 'activado' : 'desactivado'} con éxito`, package: updated });
+  } catch (error: any) {
+    res.status(500).json({ error: error.message || 'Error al cambiar estado' });
+  }
+});
+
+/**
+ * Eliminar un paquete combinado
+ */
+adminRouter.delete('/packages/:id', async (req, res) => {
+  try {
+    const { id } = req.params;
+    const existing = await prisma.package.findUnique({
+      where: { id },
+      include: { bookings: { where: { status: { in: ['PENDING', 'CONFIRMED'] } } } }
+    });
+    if (!existing || existing.businessId !== req.user!.businessId) {
+      return res.status(404).json({ error: 'Servicio combinado no encontrado' });
+    }
+    if (existing.bookings.length > 0) {
+      await prisma.package.update({ where: { id }, data: { active: false } });
+      return res.json({ message: 'El combo tiene citas agendadas, por lo que fue desactivado del catálogo.' });
+    }
+    await prisma.package.delete({ where: { id } });
+    res.json({ message: 'Servicio combinado eliminado correctamente' });
+  } catch (error: any) {
+    res.status(500).json({ error: error.message || 'Error al eliminar servicio combinado' });
+  }
+});
+
+// =========================================================================
 // GESTIÓN DE UBICACIONES Y TARIFAS DE TRASLADO A DOMICILIO
 // =========================================================================
 

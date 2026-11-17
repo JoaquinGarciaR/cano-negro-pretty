@@ -377,6 +377,87 @@ export async function deleteAdminServiceApi(id: string, token?: string) {
 }
 
 // =========================================================================
+// PAQUETES Y SERVICIOS COMBINADOS (ADMIN)
+// =========================================================================
+
+export async function fetchAdminPackagesApi(token?: string) {
+  const headers: Record<string, string> = {};
+  if (token) headers['Authorization'] = `Bearer ${token}`;
+
+  const res = await fetch(`${API_URL}/admin/packages`, {
+    headers,
+    credentials: 'include',
+    cache: 'no-store'
+  });
+
+  const data = await res.json();
+  if (!res.ok) throw new Error(data.error || 'Error al obtener paquetes combinados');
+  return data;
+}
+
+export async function createAdminPackageApi(payload: any, token?: string) {
+  const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+  if (token) headers['Authorization'] = `Bearer ${token}`;
+
+  const res = await fetch(`${API_URL}/admin/packages`, {
+    method: 'POST',
+    headers,
+    credentials: 'include',
+    body: JSON.stringify(payload)
+  });
+
+  const data = await res.json();
+  if (!res.ok) throw new Error(data.error || 'Error al crear paquete combinado');
+  return data;
+}
+
+export async function updateAdminPackageApi(id: string, payload: any, token?: string) {
+  const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+  if (token) headers['Authorization'] = `Bearer ${token}`;
+
+  const res = await fetch(`${API_URL}/admin/packages/${id}`, {
+    method: 'PUT',
+    headers,
+    credentials: 'include',
+    body: JSON.stringify(payload)
+  });
+
+  const data = await res.json();
+  if (!res.ok) throw new Error(data.error || 'Error al actualizar paquete combinado');
+  return data;
+}
+
+export async function toggleAdminPackageApi(id: string, token?: string) {
+  const headers: Record<string, string> = {};
+  if (token) headers['Authorization'] = `Bearer ${token}`;
+
+  const res = await fetch(`${API_URL}/admin/packages/${id}/toggle`, {
+    method: 'PATCH',
+    headers,
+    credentials: 'include'
+  });
+
+  const data = await res.json();
+  if (!res.ok) throw new Error(data.error || 'Error al cambiar estado del paquete');
+  return data;
+}
+
+export async function deleteAdminPackageApi(id: string, token?: string) {
+  const headers: Record<string, string> = {};
+  if (token) headers['Authorization'] = `Bearer ${token}`;
+
+  const res = await fetch(`${API_URL}/admin/packages/${id}`, {
+    method: 'DELETE',
+    headers,
+    credentials: 'include'
+  });
+
+  const data = await res.json();
+  if (!res.ok) throw new Error(data.error || 'Error al eliminar paquete');
+  return data;
+}
+
+// =========================================================================
 // UBICACIONES Y TARIFAS DE DOMICILIO (ADMIN)
 // =========================================================================
 
