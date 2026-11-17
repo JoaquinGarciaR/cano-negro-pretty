@@ -153,7 +153,7 @@ export function buildWhatsAppRescheduleMessage(params: WhatsAppRescheduleParams)
     previousScheduleLine ? previousScheduleLine : null,
     reason ? `Motivo del cambio: ${reason}` : null,
     '',
-    'Aquí tienes los detalles de tu nuevo horario:',
+    'Aquí tienes los detalles de tu nueva fecha y hora:',
     '',
     `• Referencia: ${referenceCode}`,
     `• Servicio: ${serviceName}`,

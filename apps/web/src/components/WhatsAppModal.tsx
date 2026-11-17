@@ -154,7 +154,7 @@ export function WhatsAppModal({
           </div>
           <h3 className="font-serif text-xl sm:text-2xl font-bold text-pretty-wine-900">
             {templateType === 'reschedule'
-              ? 'Mensaje de Cambio de Horario'
+              ? 'Mensaje de Cambio de Fecha y Hora'
               : templateType === 'reminder'
               ? 'Mensaje de Recordatorio'
               : templateType === 'cancellation'
@@ -194,7 +194,7 @@ export function WhatsAppModal({
               }`}
             >
               <CalendarClock className="w-3 h-3 text-pretty-pink-400" />
-              <span>Cambio Hora</span>
+              <span>Fecha y Hora</span>
             </button>
             <button
               type="button"

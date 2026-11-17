@@ -108,7 +108,7 @@ export async function fetchAdminBookings(
   return res.json();
 }
 
-export async function updateBookingStatusApi(bookingId: string, status: string, staffNotes?: string, token?: string) {
+export async function updateBookingStatusApi(bookingId: string, status: string, staffNotes?: string, token?: string, professionalId?: string) {
   const headers: Record<string, string> = { 'Content-Type': 'application/json' };
   if (token) headers['Authorization'] = `Bearer ${token}`;
 
@@ -116,7 +116,7 @@ export async function updateBookingStatusApi(bookingId: string, status: string, 
     method: 'PATCH',
     headers,
     credentials: 'include',
-    body: JSON.stringify({ status, staffNotes })
+    body: JSON.stringify({ status, staffNotes, professionalId })
   });
 
   const data = await res.json();

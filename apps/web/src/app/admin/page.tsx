@@ -37,6 +37,7 @@ import {
   Menu,
   Tag,
   CalendarClock,
+  UserCheck,
   X
 } from 'lucide-react';
 import { formatCRC } from '@cano/shared';
@@ -50,6 +51,7 @@ import {
 import { playNotificationSound, showBrowserNotification, requestNotificationPermission, unsubscribeUserFromPush } from '../../lib/sound';
 import { WhatsAppModal, WhatsAppTemplateType } from '../../components/WhatsAppModal';
 import { RescheduleModal } from '../../components/RescheduleModal';
+import { AssignBookingModal } from '../../components/AssignBookingModal';
 import { BlockTimeModal } from '../../components/BlockTimeModal';
 import { DayAvailabilityModal } from '../../components/DayAvailabilityModal';
 import { InstallPwaModal } from '../../components/InstallPwaModal';
@@ -111,6 +113,8 @@ export default function AdminDashboardPage() {
   const [previousScheduleForWa, setPreviousScheduleForWa] = useState<{ date: string; time: string } | undefined>(undefined);
   const [selectedBookingForReschedule, setSelectedBookingForReschedule] = useState<any | null>(null);
   const [isRescheduleOpen, setIsRescheduleOpen] = useState<boolean>(false);
+  const [selectedBookingForAssign, setSelectedBookingForAssign] = useState<any | null>(null);
+  const [isAssignOpen, setIsAssignOpen] = useState<boolean>(false);
   const [isBlockTimeOpen, setIsBlockTimeOpen] = useState<boolean>(false);
   const [isDayAvailOpen, setIsDayAvailOpen] = useState<boolean>(false);
   const [isInstallModalOpen, setIsInstallModalOpen] = useState<boolean>(false);
@@ -265,7 +269,21 @@ export default function AdminDashboardPage() {
     try {
       const res = await assignBookingApi(bookingId, profId, undefined, authToken);
       const targetBooking = bookings.find((b) => b.id === bookingId);
-      const profName = catalog?.professionals?.find((p: any) => p.id === profId)?.name || 'Especialista';
+      const profObj = catalog?.professionals?.find((p: any) => p.id === profId);
+      const profName = profObj?.name || 'Especialista';
+
+      // Actualizar estado en memoria inmediatamente para evitar desincronización
+      setBookings((prev) =>
+        prev.map((b) =>
+          b.id === bookingId
+            ? {
+                ...b,
+                professionalId: profId,
+                professional: profObj || { id: profId, name: profName }
+              }
+            : b
+        )
+      );
 
       // Disparar audio chime cristalino y notificación push
       showBrowserNotification(`Trabajo asignado a ${profName}`, {
@@ -273,9 +291,10 @@ export default function AdminDashboardPage() {
       });
 
       setActionSuccess(`Esteticista asignada (${profName}). La cita permanece pendiente y ya puedes confirmarla.`);
-      loadData();
+      await loadData();
     } catch (err: any) {
       setActionError(err.message || 'Error al asignar la cita');
+      throw err;
     }
   }
 
@@ -296,9 +315,14 @@ export default function AdminDashboardPage() {
         return;
       }
 
-      await updateBookingStatusApi(bookingId, newStatus, undefined, authToken);
+      await updateBookingStatusApi(bookingId, newStatus, undefined, authToken, assignedProfId);
       setActionSuccess(`Reserva actualizada a estado: ${newStatus}`);
       
+      // Actualizar estado en memoria
+      setBookings((prev) =>
+        prev.map((b) => (b.id === bookingId ? { ...b, status: newStatus } : b))
+      );
+
       // Si se confirmó, abrir automáticamente el modal de WhatsApp con la plantilla de confirmación
       if (newStatus === 'CONFIRMED') {
         const confirmedBooking = bookings.find((b) => b.id === bookingId);
@@ -321,7 +345,7 @@ export default function AdminDashboardPage() {
         }
       }
 
-      loadData();
+      await loadData();
     } catch (err: any) {
       setActionError(err.message || 'Error al actualizar reserva');
     }
@@ -592,9 +616,9 @@ export default function AdminDashboardPage() {
             ) : (
               <div className="space-y-3">
                 {pendingBookings.map((b) => {
-                  const isUnassigned = !b.professional;
                   const assignedProfId = b.professionalId || b.professional?.id;
-                  const canSelfAssign = currentUser?.professional?.id && (isUnassigned || b.professional?.id !== currentUser.professional.id);
+                  const isUnassigned = !assignedProfId;
+                  const canSelfAssign = currentUser?.professional?.id && (isUnassigned || assignedProfId !== currentUser.professional.id);
 
                   return (
                     <div
@@ -703,42 +727,29 @@ export default function AdminDashboardPage() {
                             </button>
                           )}
 
-                          <select
-                            value=""
-                            onChange={(e) => {
-                              if (e.target.value) {
-                                handleAssignBooking(b.id, e.target.value);
-                              }
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setSelectedBookingForAssign(b);
+                              setIsAssignOpen(true);
                             }}
-                            className="px-2.5 py-1.5 rounded-xl border border-pretty-pink-200 bg-white text-xs font-semibold text-pretty-wine-900 focus:outline-none focus:ring-2 focus:ring-pretty-pink-400"
+                            className={`inline-flex items-center space-x-1.5 px-3 py-1.5 rounded-full text-xs font-bold border transition-all shadow-xs active:scale-95 ${
+                              isUnassigned
+                                ? 'bg-amber-100/90 text-amber-900 border-amber-300 hover:bg-amber-200'
+                                : 'bg-white text-pretty-wine-900 border-pretty-pink-200 hover:bg-pretty-pink-50'
+                            }`}
+                            title="Asignar o reasignar esteticista de forma interactiva"
                           >
-                            <option value="" disabled>
-                              {isUnassigned ? 'Asignar a especialista...' : 'Reasignar a...'}
-                            </option>
-                            {catalog?.professionals?.map((p: any) => {
-                              // Verificar si esta profesional ya tiene una cita confirmada en este intervalo
-                              const hasConflict = bookings.some((other) => {
-                                if (other.id === b.id || other.status !== 'CONFIRMED') return false;
-                                const otherProfId = other.professionalId || other.professional?.id;
-                                if (otherProfId !== p.id) return false;
-                                return (
-                                  new Date(b.startTime) < new Date(other.endTime) &&
-                                  new Date(b.endTime) > new Date(other.startTime)
-                                );
-                              });
-
-                              const isCurrentAssigned = (b.professionalId || b.professional?.id) === p.id;
-
-                              return (
-                                <option key={p.id} value={p.id} disabled={hasConflict}>
-                                  {p.name} {hasConflict ? '(Ocupada en este horario)' : isCurrentAssigned ? '(Asignada actual)' : ''}
-                                </option>
-                              );
-                            })}
-                          </select>
+                            <UserCheck className="w-3.5 h-3.5 text-pretty-pink-500" />
+                            <span>
+                              {isUnassigned
+                                ? 'Asignar esteticista...'
+                                : `Reasignar (${b.professional?.name || 'Esteticista'})`}
+                            </span>
+                          </button>
                         </div>
 
-                        {/* Botones de Cambiar Horario / WhatsApp / Rechazar / Confirmar */}
+                        {/* Botones de Cambiar Fecha y Hora / WhatsApp / Rechazar / Confirmar */}
                         <div className="flex flex-wrap items-center gap-1.5">
                           <button
                             type="button"
@@ -747,10 +758,10 @@ export default function AdminDashboardPage() {
                               setIsRescheduleOpen(true);
                             }}
                             className="inline-flex items-center space-x-1 px-2.5 py-1.5 rounded-full text-xs font-semibold bg-white hover:bg-pretty-pink-50 text-pretty-wine-900 border border-pretty-pink-200 shadow-sm transition-all"
-                            title="Cambiar fecha u hora de la cita"
+                            title="Cambiar fecha y hora de la cita de forma interactiva"
                           >
                             <CalendarClock className="w-3.5 h-3.5 text-pretty-pink-500" />
-                            <span>Cambiar horario</span>
+                            <span>Cambiar fecha y hora</span>
                           </button>
 
                           <button
@@ -1108,7 +1119,7 @@ export default function AdminDashboardPage() {
                                 title="Cambiar fecha u hora de la cita"
                               >
                                 <CalendarClock className="w-3 h-3 text-pretty-pink-500" />
-                                <span>Cambiar horario</span>
+                                <span>Cambiar fecha y hora</span>
                               </button>
 
                               <button
@@ -1348,7 +1359,7 @@ export default function AdminDashboardPage() {
                             title="Cambiar fecha u hora de la cita"
                           >
                             <CalendarClock className="w-3 h-3 text-pretty-pink-500" />
-                            <span>Cambiar horario</span>
+                            <span>Cambiar fecha y hora</span>
                           </button>
 
                           <button
@@ -1540,7 +1551,7 @@ export default function AdminDashboardPage() {
         previousSchedule={previousScheduleForWa}
       />
 
-      {/* Modal de Cambio de Horario / Reprogramación */}
+      {/* Modal de Cambio de Fecha y Hora / Reprogramación */}
       <RescheduleModal
         isOpen={isRescheduleOpen}
         onClose={() => setIsRescheduleOpen(false)}
@@ -1555,6 +1566,23 @@ export default function AdminDashboardPage() {
           setWaInitialTemplate('reschedule');
           setPreviousScheduleForWa(previousSchedule);
           setIsWaOpen(true);
+        }}
+      />
+
+      {/* Modal Interactivo de Asignación / Reasignación de Esteticista */}
+      <AssignBookingModal
+        isOpen={isAssignOpen}
+        onClose={() => setIsAssignOpen(false)}
+        booking={selectedBookingForAssign}
+        professionals={catalog?.professionals || []}
+        allBookings={bookings}
+        currentUserProfId={currentUser?.professional?.id}
+        onAssign={async (bookingId, profId) => {
+          await handleAssignBooking(bookingId, profId);
+        }}
+        onOpenReschedule={(b) => {
+          setSelectedBookingForReschedule(b);
+          setIsRescheduleOpen(true);
         }}
       />
 

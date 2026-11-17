@@ -1,16 +1,19 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import {
   X,
   Calendar,
   Clock,
   User,
+  Users,
   AlertCircle,
   CheckCircle2,
   CalendarClock,
   Sparkles,
-  Info
+  ChevronRight,
+  Sun,
+  Moon
 } from 'lucide-react';
 import { fetchAvailability, fetchOpenDays, rescheduleBookingApi } from '../lib/api';
 
@@ -122,6 +125,59 @@ export function RescheduleModal({
     };
   }, [isOpen, booking, selectedDate, selectedProfId]);
 
+  // Generar lista interactiva de días rápidos a partir de openDays o próximos 14 días
+  const quickDays = useMemo(() => {
+    if (openDays.length > 0) {
+      return openDays.slice(0, 10).map((od) => {
+        const [year, month, day] = od.date.split('-').map(Number);
+        const dObj = new Date(year, month - 1, day, 12, 0, 0);
+        return {
+          dateStr: od.date,
+          dayName: dObj.toLocaleDateString('es-CR', { weekday: 'short' }),
+          dayNum: day,
+          monthName: dObj.toLocaleDateString('es-CR', { month: 'short' })
+        };
+      });
+    }
+
+    // Fallback: próximos 7 días a partir de hoy
+    const list = [];
+    const today = new Date();
+    for (let i = 0; i < 7; i++) {
+      const d = new Date(today.getTime() + i * 86400000);
+      const y = d.getFullYear();
+      const m = String(d.getMonth() + 1).padStart(2, '0');
+      const dayNum = String(d.getDate()).padStart(2, '0');
+      list.push({
+        dateStr: `${y}-${m}-${dayNum}`,
+        dayName: d.toLocaleDateString('es-CR', { weekday: 'short' }),
+        dayNum: d.getDate(),
+        monthName: d.toLocaleDateString('es-CR', { month: 'short' })
+      });
+    }
+    return list;
+  }, [openDays]);
+
+  // Agrupar turnos en Mañana y Tarde para facilidad visual
+  const { morningSlots, afternoonSlots } = useMemo(() => {
+    const morning: any[] = [];
+    const afternoon: any[] = [];
+
+    availableSlots.forEach((slot) => {
+      const hourPart = parseInt(slot.localStartTime.split(':')[0], 10);
+      const isPm = slot.localStartTime.toLowerCase().includes('p. m.') || slot.localStartTime.toLowerCase().includes('pm');
+      const hour24 = isPm && hourPart !== 12 ? hourPart + 12 : (!isPm && hourPart === 12 ? 0 : hourPart);
+
+      if (hour24 < 12) {
+        morning.push(slot);
+      } else {
+        afternoon.push(slot);
+      }
+    });
+
+    return { morningSlots: morning, afternoonSlots: afternoon };
+  }, [availableSlots]);
+
   if (!isOpen || !booking) return null;
 
   const currentStartDateObj = new Date(booking.startTime);
@@ -173,6 +229,57 @@ export function RescheduleModal({
     }
   }
 
+  function renderSlotButton(slot: any) {
+    const isChosen = selectedSlot?.startTime === slot.startTime;
+    const isAvailable = slot.available;
+
+    return (
+      <button
+        key={slot.startTime}
+        type="button"
+        onClick={() => {
+          if (!isAvailable) {
+            const reasonText = slot.conflictDetail
+              ? slot.conflictDetail
+              : selectedProfId === 'all'
+              ? 'Este horario no está disponible para ningún estilista del salón (ocupado o fuera de horario).'
+              : 'La esteticista seleccionada no tiene disponibilidad en este horario.';
+
+            setUnavailableFeedback({
+              time: slot.localStartTime,
+              reason: reasonText
+            });
+          } else {
+            setSelectedSlot(slot);
+            setUnavailableFeedback(null);
+            setErrorMsg(null);
+          }
+        }}
+        className={`relative py-2.5 px-2 text-center rounded-xl text-xs font-semibold transition-all ${
+          isChosen
+            ? 'bg-pretty-wine-900 text-white shadow-md scale-102 z-10'
+            : isAvailable
+            ? 'bg-white hover:bg-pretty-pink-50 text-pretty-wine-900 border border-pretty-pink-200/80 shadow-2xs'
+            : 'bg-gray-100/90 text-gray-400 border border-gray-200/70 cursor-pointer hover:border-rose-300 hover:bg-rose-50/50'
+        }`}
+        title={
+          isAvailable
+            ? `Turno libre: ${slot.localStartTime} a ${slot.localEndTime}`
+            : `No disponible: ${slot.conflictDetail || 'Ocupado'}`
+        }
+      >
+        <span className={!isAvailable ? 'line-through text-gray-400' : ''}>
+          {slot.localStartTime}
+        </span>
+        {!isAvailable && (
+          <span className="block text-[9px] font-normal text-rose-500 mt-0.5">
+            Ocupado
+          </span>
+        )}
+      </button>
+    );
+  }
+
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-pretty-wine-950/45 backdrop-blur-sm overflow-y-auto">
       <div className="relative w-full max-w-xl glass-panel rounded-3xl p-5 sm:p-7 shadow-2xl border border-white/80 my-auto text-pretty-wine-900 max-h-[95vh] overflow-y-auto">
@@ -181,6 +288,7 @@ export function RescheduleModal({
         <button
           onClick={onClose}
           className="absolute top-5 right-5 p-2 rounded-full bg-white/70 hover:bg-white text-pretty-wine-800 transition-colors shadow-sm"
+          title="Cerrar modal"
         >
           <X className="w-4 h-4" />
         </button>
@@ -189,10 +297,10 @@ export function RescheduleModal({
         <div className="mb-4">
           <div className="flex items-center space-x-2 text-xs font-semibold text-pretty-pink-600 uppercase tracking-wider mb-1">
             <CalendarClock className="w-3.5 h-3.5" />
-            <span>Reprogramación de Cita · Caño Negro Pretty</span>
+            <span>Reprogramación · Caño Negro Pretty</span>
           </div>
           <h3 className="font-serif text-xl sm:text-2xl font-bold text-pretty-wine-900">
-            Cambio de Horario
+            Cambio de Fecha y Hora
           </h3>
           <p className="text-xs text-pretty-wine-800/80 mt-0.5">
             Cita <strong>#{booking.referenceCode}</strong> · Clienta: <strong>{booking.clientName}</strong> ({booking.clientPhone})
@@ -203,7 +311,7 @@ export function RescheduleModal({
         <div className="mb-4 p-3 rounded-2xl bg-pretty-pink-100/60 border border-pretty-pink-200/70 text-xs text-pretty-wine-900 flex flex-col sm:flex-row sm:items-center justify-between gap-2">
           <div>
             <span className="text-[11px] font-bold uppercase text-pretty-wine-700/80 block">
-              Horario Agendado Actualmente:
+              Horario Actual:
             </span>
             <div className="flex items-center space-x-1.5 font-semibold text-pretty-wine-950 mt-0.5">
               <Calendar className="w-3.5 h-3.5 text-pretty-pink-600" />
@@ -225,158 +333,189 @@ export function RescheduleModal({
           </div>
         </div>
 
-        {/* Selector de Esteticista */}
+        {/* 1. Selector Interactivo de Esteticista (Pills) */}
         <div className="mb-4">
-          <label className="block text-xs font-semibold text-pretty-wine-900 mb-1 flex items-center space-x-1">
+          <label className="block text-xs font-bold text-pretty-wine-900 mb-2 flex items-center space-x-1.5">
             <User className="w-3.5 h-3.5 text-pretty-pink-500" />
-            <span>Esteticista para el nuevo horario:</span>
+            <span>1. Selecciona la Esteticista para el nuevo horario:</span>
           </label>
-          <select
-            value={selectedProfId}
-            onChange={(e) => {
-              const val = e.target.value;
-              setSelectedProfId(val);
-              loadUnlockedDays(val);
-            }}
-            className="w-full px-3 py-2 rounded-xl border border-pretty-pink-200 bg-white text-xs font-semibold text-pretty-wine-900 focus:outline-none focus:ring-2 focus:ring-pretty-pink-400"
-          >
-            <option value="all">Cualquier esteticista disponible del equipo</option>
-            {professionals.map((p) => (
-              <option key={p.id} value={p.id}>
-                {p.name} {p.id === booking.professionalId ? '(Actual)' : ''}
-              </option>
-            ))}
-          </select>
-        </div>
+          
+          <div className="flex flex-wrap gap-2">
+            <button
+              type="button"
+              onClick={() => {
+                setSelectedProfId('all');
+                loadUnlockedDays('all');
+              }}
+              className={`inline-flex items-center space-x-1.5 px-3 py-1.5 rounded-full text-xs font-semibold border transition-all ${
+                selectedProfId === 'all'
+                  ? 'bg-pretty-wine-900 text-white border-pretty-wine-900 shadow-sm'
+                  : 'bg-white hover:bg-pretty-pink-50 text-pretty-wine-900 border-pretty-pink-200 shadow-2xs'
+              }`}
+            >
+              <Users className="w-3 h-3 text-pretty-pink-400" />
+              <span>Cualquier esteticista libre</span>
+            </button>
 
-        {/* Selector de Fecha */}
-        <div className="mb-4">
-          <label className="block text-xs font-semibold text-pretty-wine-900 mb-1 flex items-center justify-between">
-            <span className="flex items-center space-x-1">
-              <Calendar className="w-3.5 h-3.5 text-pretty-pink-500" />
-              <span>Nueva Fecha:</span>
-            </span>
-            {openDays.length > 0 && (
-              <span className="text-[11px] text-emerald-700 font-normal">
-                {openDays.length} días con jornada abierta
-              </span>
-            )}
-          </label>
+            {professionals.map((p) => {
+              const isSelected = selectedProfId === p.id;
+              const isCurrent = p.id === (booking.professionalId || booking.professional?.id);
 
-          <input
-            type="date"
-            value={selectedDate}
-            min={new Date().toISOString().split('T')[0]}
-            onChange={(e) => setSelectedDate(e.target.value)}
-            className="w-full px-3 py-2 rounded-xl border border-pretty-pink-200 bg-white text-xs font-semibold text-pretty-wine-900 focus:outline-none focus:ring-2 focus:ring-pretty-pink-400"
-          />
-
-          {/* Días recomendados rápidos */}
-          {openDays.length > 0 && (
-            <div className="flex flex-wrap gap-1.5 mt-2">
-              <span className="text-[10px] text-pretty-wine-700/80 self-center mr-1">Días abiertos:</span>
-              {openDays.slice(0, 6).map((od) => (
+              return (
                 <button
-                  key={od.date}
+                  key={p.id}
                   type="button"
-                  onClick={() => setSelectedDate(od.date)}
-                  className={`text-[11px] px-2.5 py-1 rounded-full font-semibold border transition-all ${
-                    selectedDate === od.date
+                  onClick={() => {
+                    setSelectedProfId(p.id);
+                    loadUnlockedDays(p.id);
+                  }}
+                  className={`inline-flex items-center space-x-1.5 px-3 py-1.5 rounded-full text-xs font-semibold border transition-all ${
+                    isSelected
                       ? 'bg-pretty-wine-900 text-white border-pretty-wine-900 shadow-sm'
-                      : 'bg-white text-pretty-wine-900 border-pretty-pink-200 hover:bg-pretty-pink-50'
+                      : 'bg-white hover:bg-pretty-pink-50 text-pretty-wine-900 border-pretty-pink-200 shadow-2xs'
                   }`}
                 >
-                  {od.date}
+                  <div className={`w-4 h-4 rounded-full flex items-center justify-center text-[9px] font-bold ${
+                    isSelected ? 'bg-white/20 text-white' : 'bg-pretty-pink-100 text-pretty-wine-900'
+                  }`}>
+                    {p.name.slice(0, 1)}
+                  </div>
+                  <span>{p.name}</span>
+                  {isCurrent && (
+                    <span className={`text-[9px] px-1 rounded ${
+                      isSelected ? 'bg-white/30 text-white' : 'bg-pretty-pink-100 text-pretty-pink-700'
+                    }`}>
+                      Actual
+                    </span>
+                  )}
                 </button>
-              ))}
-            </div>
-          )}
+              );
+            })}
+          </div>
         </div>
 
-        {/* Selector de Horario / Slots con Feedback de No Disponibilidad */}
+        {/* 2. Selector Interactivo de Nueva Fecha (Barra de Días + Selector Calendario) */}
         <div className="mb-4">
-          <label className="block text-xs font-semibold text-pretty-wine-900 mb-1.5 flex items-center justify-between">
-            <span className="flex items-center space-x-1">
+          <div className="flex items-center justify-between mb-2">
+            <label className="text-xs font-bold text-pretty-wine-900 flex items-center space-x-1.5">
+              <Calendar className="w-3.5 h-3.5 text-pretty-pink-500" />
+              <span>2. Selecciona la Nueva Fecha:</span>
+            </label>
+            {openDays.length > 0 && (
+              <span className="text-[11px] text-emerald-700 font-medium">
+                {openDays.length} días con jornada activa
+              </span>
+            )}
+          </div>
+
+          {/* Días interactivos en cuadrícula / barra horizontal */}
+          <div className="grid grid-cols-4 sm:grid-cols-7 gap-1.5 mb-2.5">
+            {quickDays.slice(0, 7).map((qd) => {
+              const isSelected = selectedDate === qd.dateStr;
+              return (
+                <button
+                  key={qd.dateStr}
+                  type="button"
+                  onClick={() => setSelectedDate(qd.dateStr)}
+                  className={`p-2 rounded-2xl border text-center transition-all ${
+                    isSelected
+                      ? 'bg-pretty-wine-900 text-white border-pretty-wine-900 shadow-md scale-102'
+                      : 'bg-white hover:bg-pretty-pink-50 text-pretty-wine-900 border-pretty-pink-200/80 shadow-2xs'
+                  }`}
+                >
+                  <span className={`text-[10px] font-bold uppercase block ${
+                    isSelected ? 'text-pretty-pink-300' : 'text-pretty-wine-700/80'
+                  }`}>
+                    {qd.dayName}
+                  </span>
+                  <span className="text-base font-serif font-bold block my-0.5">
+                    {qd.dayNum}
+                  </span>
+                  <span className={`text-[9px] block ${
+                    isSelected ? 'text-white/80' : 'text-pretty-wine-700/60'
+                  }`}>
+                    {qd.monthName}
+                  </span>
+                </button>
+              );
+            })}
+          </div>
+
+          {/* Selector de fecha nativo para cualquier otra fecha */}
+          <div className="flex items-center space-x-2">
+            <span className="text-[11px] text-pretty-wine-700/80 whitespace-nowrap">
+              O elige otra fecha:
+            </span>
+            <input
+              type="date"
+              value={selectedDate}
+              min={new Date().toISOString().split('T')[0]}
+              onChange={(e) => setSelectedDate(e.target.value)}
+              className="flex-1 px-3 py-1.5 rounded-xl border border-pretty-pink-200 bg-white text-xs font-semibold text-pretty-wine-900 focus:outline-none focus:ring-2 focus:ring-pretty-pink-400"
+            />
+          </div>
+        </div>
+
+        {/* 3. Selector Interactivo de Nueva Hora / Slots con Feedback de No Disponibilidad */}
+        <div className="mb-4">
+          <div className="flex items-center justify-between mb-2">
+            <label className="text-xs font-bold text-pretty-wine-900 flex items-center space-x-1.5">
               <Clock className="w-3.5 h-3.5 text-pretty-pink-500" />
-              <span>Selecciona la Nueva Hora:</span>
+              <span>3. Selecciona la Nueva Hora:</span>
+            </label>
+            <span className="text-[11px] text-pretty-wine-700/70">
+              Duración: {booking.durationMinutes || booking.snapshotDurationMinutes || 60} min
             </span>
-            <span className="text-[11px] text-pretty-wine-700/70 font-normal">
-              Bloques de {booking.durationMinutes || booking.snapshotDurationMinutes || 60} min
-            </span>
-          </label>
+          </div>
 
           {loadingSlots ? (
-            <div className="py-6 text-center text-xs text-pretty-wine-800/80 bg-white/40 rounded-2xl border border-white">
+            <div className="py-8 text-center text-xs text-pretty-wine-800/80 bg-white/40 rounded-2xl border border-white">
               Consultando turnos libres con el equipo...
             </div>
           ) : !selectedDate ? (
-            <div className="py-6 text-center text-xs text-pretty-wine-800/70 bg-white/40 rounded-2xl border border-white">
-              Selecciona una fecha arriba para ver los turnos disponibles.
+            <div className="py-8 text-center text-xs text-pretty-wine-800/70 bg-white/40 rounded-2xl border border-white">
+              Selecciona una fecha arriba para cargar los turnos disponibles.
             </div>
           ) : availableSlots.length === 0 ? (
-            <div className="py-6 text-center text-xs text-pretty-wine-800/80 bg-white/60 rounded-2xl border border-white/80 p-4">
-              <AlertCircle className="w-4 h-4 text-pretty-pink-500 mx-auto mb-1" />
-              <span>No hay turnos disponibles para esta fecha o no se ha desbloqueado la jornada.</span>
+            <div className="py-8 text-center text-xs text-pretty-wine-800/80 bg-white/60 rounded-2xl border border-white/80 p-4">
+              <AlertCircle className="w-5 h-5 text-pretty-pink-500 mx-auto mb-1.5" />
+              <span className="font-semibold block">No hay turnos disponibles para esta fecha.</span>
+              <span className="text-[11px] text-pretty-wine-700/70 mt-1 block">
+                Verifica que la fecha tenga jornada abierta o selecciona otra esteticista.
+              </span>
             </div>
           ) : (
-            <div>
-              <div className="grid grid-cols-3 sm:grid-cols-4 gap-2 max-h-48 overflow-y-auto p-1.5 bg-white/40 rounded-2xl border border-pretty-pink-200/50">
-                {availableSlots.map((slot) => {
-                  const isChosen = selectedSlot?.startTime === slot.startTime;
-                  const isAvailable = slot.available;
+            <div className="space-y-3">
+              
+              {/* Sección Mañana si hay */}
+              {morningSlots.length > 0 && (
+                <div>
+                  <div className="flex items-center space-x-1.5 text-[11px] font-bold text-pretty-wine-800 mb-1.5">
+                    <Sun className="w-3 h-3 text-amber-500" />
+                    <span>Mañana</span>
+                  </div>
+                  <div className="grid grid-cols-3 sm:grid-cols-4 gap-2">
+                    {morningSlots.map((slot) => renderSlotButton(slot))}
+                  </div>
+                </div>
+              )}
 
-                  return (
-                    <button
-                      key={slot.startTime}
-                      type="button"
-                      onClick={() => {
-                        if (!isAvailable) {
-                          // Feedback explicativo al usuario
-                          const reasonText = slot.conflictDetail
-                            ? slot.conflictDetail
-                            : selectedProfId === 'all'
-                            ? 'Este horario no está disponible para ningún estilista del salón (ocupado o fuera de horario).'
-                            : 'La esteticista seleccionada no tiene disponibilidad en este horario.';
+              {/* Sección Tarde si hay */}
+              {afternoonSlots.length > 0 && (
+                <div>
+                  <div className="flex items-center space-x-1.5 text-[11px] font-bold text-pretty-wine-800 mb-1.5">
+                    <Moon className="w-3 h-3 text-indigo-500" />
+                    <span>Tarde</span>
+                  </div>
+                  <div className="grid grid-cols-3 sm:grid-cols-4 gap-2">
+                    {afternoonSlots.map((slot) => renderSlotButton(slot))}
+                  </div>
+                </div>
+              )}
 
-                          setUnavailableFeedback({
-                            time: slot.localStartTime,
-                            reason: reasonText
-                          });
-                        } else {
-                          setSelectedSlot(slot);
-                          setUnavailableFeedback(null);
-                          setErrorMsg(null);
-                        }
-                      }}
-                      className={`relative py-2 px-2 text-center rounded-xl text-xs font-semibold transition-all ${
-                        isChosen
-                          ? 'bg-pretty-wine-900 text-white shadow-md scale-105 z-10'
-                          : isAvailable
-                          ? 'bg-white hover:bg-pretty-pink-50 text-pretty-wine-900 border border-pretty-pink-200/80 shadow-xs'
-                          : 'bg-gray-100/80 text-gray-400 border border-gray-200/70 cursor-pointer hover:border-rose-300 hover:bg-rose-50/50'
-                      }`}
-                      title={
-                        isAvailable
-                          ? `Turno libre: ${slot.localStartTime} a ${slot.localEndTime}`
-                          : `No disponible: ${slot.conflictDetail || 'Ocupado'}`
-                      }
-                    >
-                      <span className={!isAvailable ? 'line-through text-gray-400' : ''}>
-                        {slot.localStartTime}
-                      </span>
-                      {!isAvailable && (
-                        <span className="block text-[9px] font-normal text-rose-500 mt-0.5">
-                          Ocupado
-                        </span>
-                      )}
-                    </button>
-                  );
-                })}
-              </div>
-
-              {/* AVISO IMPORTANTE: Feedback explícito cuando se pulsa un horario no disponible */}
+              {/* AVISO IMPORTANTE: Feedback interactivo y explícito cuando se pulsa un horario no disponible */}
               {unavailableFeedback && (
-                <div className="mt-2.5 p-3 rounded-2xl bg-rose-50/90 border border-rose-200/80 text-xs text-rose-900 flex items-start space-x-2.5 animate-fadeIn">
+                <div className="p-3 rounded-2xl bg-rose-50/90 border border-rose-200 text-xs text-rose-900 flex items-start space-x-2.5 animate-fadeIn mt-2">
                   <AlertCircle className="w-4 h-4 text-rose-600 flex-shrink-0 mt-0.5" />
                   <div className="flex-1">
                     <div className="font-bold text-rose-950 flex items-center space-x-1.5">
@@ -386,7 +525,7 @@ export function RescheduleModal({
                       {unavailableFeedback.reason}
                     </p>
                     <p className="mt-1 text-[11px] text-rose-700 font-medium">
-                      Por favor selecciona cualquiera de los turnos en blanco (habilitados) para continuar.
+                      Selecciona cualquiera de los turnos en blanco (habilitados) para confirmar la reprogramación.
                     </p>
                   </div>
                 </div>
@@ -394,6 +533,31 @@ export function RescheduleModal({
             </div>
           )}
         </div>
+
+        {/* Resumen del cambio seleccionado */}
+        {selectedSlot && (
+          <div className="mb-4 p-3 rounded-2xl bg-emerald-50 border border-emerald-200 text-xs text-emerald-900 flex items-center justify-between">
+            <div>
+              <span className="font-bold text-[11px] uppercase text-emerald-800 block">
+                Nuevo Horario Seleccionado:
+              </span>
+              <div className="flex items-center space-x-1.5 font-bold text-emerald-950 mt-0.5">
+                <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" />
+                <span>{selectedDate}</span>
+                <span>·</span>
+                <span>{selectedSlot.localStartTime}</span>
+              </div>
+            </div>
+            <div className="text-right">
+              <span className="text-[11px] text-emerald-800">Esteticista:</span>
+              <div className="font-bold">
+                {selectedProfId === 'all'
+                  ? 'Cualquiera libre'
+                  : professionals.find((p) => p.id === selectedProfId)?.name || 'Asignada'}
+              </div>
+            </div>
+          </div>
+        )}
 
         {/* Notas del Personal (Opcional) */}
         <div className="mb-4">
@@ -439,7 +603,7 @@ export function RescheduleModal({
             }`}
           >
             <CheckCircle2 className="w-4 h-4" />
-            <span>{submitting ? 'Reprogramando...' : 'Confirmar Cambio de Horario'}</span>
+            <span>{submitting ? 'Reprogramando...' : 'Confirmar Cambio de Fecha y Hora'}</span>
           </button>
         </div>
 
