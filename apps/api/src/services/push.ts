@@ -64,3 +64,31 @@ export async function sendPushToSalon(businessId: string, payload: { title: stri
   }
   return totalSent;
 }
+
+export async function sendPushToProfessional(
+  professionalId: string,
+  payload: { title: string; body: string; url?: string }
+) {
+  const user = await prisma.user.findFirst({
+    where: { professionalId },
+    select: { id: true }
+  });
+  if (!user) return { total: 0, sent: 0 };
+  return await sendPushToUser(user.id, payload);
+}
+
+export async function sendPushToOwners(
+  businessId: string,
+  payload: { title: string; body: string; url?: string }
+) {
+  const owners = await prisma.user.findMany({
+    where: { businessId, role: 'OWNER' },
+    select: { id: true }
+  });
+  let totalSent = 0;
+  for (const o of owners) {
+    const res = await sendPushToUser(o.id, payload);
+    totalSent += res.sent;
+  }
+  return totalSent;
+}

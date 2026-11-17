@@ -27,6 +27,7 @@ interface ManualBookingModalProps {
   catalog: any;
   token?: string;
   onSuccess: () => void;
+  activeTab?: string;
 }
 
 export function ManualBookingModal({
@@ -34,7 +35,8 @@ export function ManualBookingModal({
   onClose,
   catalog,
   token,
-  onSuccess
+  onSuccess,
+  activeTab
 }: ManualBookingModalProps) {
   const [clientName, setClientName] = useState<string>('');
   const [countryCode, setCountryCode] = useState<string>('+506');
@@ -65,6 +67,35 @@ export function ManualBookingModal({
   // Estados de interacción para validación estricta de campos obligatorios
   const [touchedName, setTouchedName] = useState<boolean>(false);
   const [touchedPhone, setTouchedPhone] = useState<boolean>(false);
+
+  // Función para restablecer por completo los campos del formulario
+  function resetForm() {
+    setClientName('');
+    setCountryCode('+506');
+    setClientPhone('');
+    setModality('AT_STATION');
+    setLocationId('');
+    setCustomAddress('');
+    setServiceType('service');
+    setServiceId(catalog?.services?.[0]?.id || '');
+    setPackageId('');
+    setProfessionalId(catalog?.professionals?.[0]?.id || '');
+    setDate(new Date().toISOString().split('T')[0]);
+    setSelectedStartTime('');
+    setClientNotes('');
+    setStaffNotes('Cita ingresada en recepción');
+    setTouchedName(false);
+    setTouchedPhone(false);
+    setError(null);
+    setSlotWarning(null);
+  }
+
+  // Si el usuario sale de la pantalla de pendientes por revisar, se descarta el borrador
+  useEffect(() => {
+    if (activeTab && activeTab !== 'pending') {
+      resetForm();
+    }
+  }, [activeTab]);
 
   // Reiniciar validaciones y advertencias al abrir el modal
   useEffect(() => {
@@ -296,6 +327,9 @@ export function ManualBookingModal({
       showBrowserNotification(`Cita asignada a ${profName}`, {
         body: `Cita #${res.booking?.referenceCode || ''} para ${clientName} a las ${selectedStartTime} hrs (${durationMinutes} min).`
       });
+
+      // Si ya se creó la cita con éxito, se restablece el formulario a blanco
+      resetForm();
 
       onSuccess();
       onClose();
@@ -881,34 +915,49 @@ export function ManualBookingModal({
             </div>
           )}
 
-          <div className="pt-2 flex justify-end space-x-2">
-            <button
-              type="button"
-              onClick={onClose}
-              className="px-4 py-2 rounded-full text-xs font-semibold text-pretty-wine-800 hover:bg-white"
-            >
-              Cancelar
-            </button>
-            <button
-              type="submit"
-              disabled={!canSubmit}
-              className={`px-5 py-2 rounded-full text-xs font-bold text-white transition-all shadow-sm ${
-                !canSubmit
-                  ? 'opacity-50 bg-pretty-wine-900/60 cursor-not-allowed'
-                  : 'bg-pretty-wine-900 hover:bg-pretty-pink-600 active:scale-95'
-              }`}
-              title={
-                !isNameValid
-                  ? 'El nombre de la clienta es obligatorio'
-                  : !isPhoneValid
-                  ? `El teléfono celular es obligatorio (${selectedCountry.digits} dígitos)`
-                  : !selectedStartTime
-                  ? 'Seleccione un bloque de inicio disponible'
-                  : 'Confirmar Cita'
-              }
-            >
-              {loading ? 'Guardando...' : 'Confirmar Cita'}
-            </button>
+          <div className="pt-2 flex items-center justify-between">
+            {clientName.trim() || clientPhone.trim() || selectedStartTime || customAddress.trim() || clientNotes.trim() ? (
+              <button
+                type="button"
+                onClick={resetForm}
+                className="px-3 py-1.5 rounded-full text-xs font-semibold text-pretty-wine-700/60 hover:text-rose-700 hover:bg-rose-50 transition-colors"
+                title="Limpiar campos del borrador"
+              >
+                Limpiar formulario
+              </button>
+            ) : (
+              <div />
+            )}
+
+            <div className="flex items-center space-x-2">
+              <button
+                type="button"
+                onClick={onClose}
+                className="px-4 py-2 rounded-full text-xs font-semibold text-pretty-wine-800 hover:bg-white"
+              >
+                Cancelar
+              </button>
+              <button
+                type="submit"
+                disabled={!canSubmit}
+                className={`px-5 py-2 rounded-full text-xs font-bold text-white transition-all shadow-sm ${
+                  !canSubmit
+                    ? 'opacity-50 bg-pretty-wine-900/60 cursor-not-allowed'
+                    : 'bg-pretty-wine-900 hover:bg-pretty-pink-600 active:scale-95'
+                }`}
+                title={
+                  !isNameValid
+                    ? 'El nombre de la clienta es obligatorio'
+                    : !isPhoneValid
+                    ? `El teléfono celular es obligatorio (${selectedCountry.digits} dígitos)`
+                    : !selectedStartTime
+                    ? 'Seleccione un bloque de inicio disponible'
+                    : 'Confirmar Cita'
+                }
+              >
+                {loading ? 'Guardando...' : 'Confirmar Cita'}
+              </button>
+            </div>
           </div>
 
         </form>

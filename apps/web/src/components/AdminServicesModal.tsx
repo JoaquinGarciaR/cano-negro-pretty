@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef, useMemo } from 'react';
 import {
   X,
   Sparkles,
@@ -16,7 +16,8 @@ import {
   Image as ImageIcon,
   Users,
   Search,
-  Power
+  Power,
+  ChevronDown
 } from 'lucide-react';
 import {
   fetchAdminServicesApi,
@@ -35,7 +36,30 @@ interface AdminServicesModalProps {
   onServicesUpdated?: () => void;
 }
 
-const CATEGORIES = ['Uñas', 'Pestañas', 'Peinados', 'Cuidado Facial', 'Maquillaje'];
+const CATEGORIES = [
+  { id: 'unas', label: 'Uñas' },
+  { id: 'pestanas', label: 'Pestañas' },
+  { id: 'peinados', label: 'Peinados' },
+  { id: 'facial', label: 'Cuidado Facial' },
+  { id: 'maquillaje', label: 'Maquillaje' }
+];
+
+export function getCategoryLabel(catIdOrName: string): string {
+  const norm = (catIdOrName || '').toLowerCase().trim();
+  if (norm === 'unas' || norm === 'uñas') return 'Uñas';
+  if (norm === 'pestanas' || norm === 'pestañas') return 'Pestañas';
+  if (norm === 'peinados' || norm === 'peinado') return 'Peinados';
+  if (norm === 'facial' || norm === 'cuidado facial') return 'Cuidado Facial';
+  if (norm === 'maquillaje') return 'Maquillaje';
+  return catIdOrName || 'General';
+}
+
+export function normalizeCategoryId(catIdOrName: string): string {
+  const norm = (catIdOrName || '').toLowerCase().trim();
+  if (norm === 'uñas') return 'unas';
+  if (norm === 'pestañas') return 'pestanas';
+  return norm;
+}
 
 export function AdminServicesModal({
   isOpen,
@@ -50,6 +74,65 @@ export function AdminServicesModal({
   const [success, setSuccess] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedCategory, setSelectedCategory] = useState('ALL');
+
+  // Estado para el Dropdown de Categorías con Buscador
+  const [isCategoryDropdownOpen, setIsCategoryDropdownOpen] = useState(false);
+  const [categorySearchQuery, setCategorySearchQuery] = useState('');
+  const categoryDropdownRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    function handleClickOutside(e: MouseEvent | TouchEvent) {
+      if (categoryDropdownRef.current && !categoryDropdownRef.current.contains(e.target as Node)) {
+        setIsCategoryDropdownOpen(false);
+      }
+    }
+    function handleKeyDown(e: KeyboardEvent) {
+      if (e.key === 'Escape') {
+        setIsCategoryDropdownOpen(false);
+      }
+    }
+    if (isCategoryDropdownOpen) {
+      document.addEventListener('pointerdown', handleClickOutside);
+      document.addEventListener('keydown', handleKeyDown);
+    }
+    return () => {
+      document.removeEventListener('pointerdown', handleClickOutside);
+      document.removeEventListener('keydown', handleKeyDown);
+    };
+  }, [isCategoryDropdownOpen]);
+
+  // Lista de categorías únicas estructuradas (id y label)
+  const allCategories = useMemo(() => {
+    const map = new Map<string, string>();
+    CATEGORIES.forEach((c) => map.set(c.id, c.label));
+    services.forEach((s) => {
+      if (s.category) {
+        const id = normalizeCategoryId(s.category);
+        const label = getCategoryLabel(s.category);
+        if (!map.has(id)) map.set(id, label);
+      }
+    });
+    return Array.from(map.entries()).map(([id, label]) => ({ id, label }));
+  }, [services]);
+
+  // Conteo de servicios por categoría
+  const categoryCounts = useMemo(() => {
+    const map = new Map<string, number>();
+    services.forEach((s) => {
+      const id = normalizeCategoryId(s.category || 'otros');
+      map.set(id, (map.get(id) || 0) + 1);
+    });
+    return map;
+  }, [services]);
+
+  // Categorías filtradas por la barra de búsqueda dentro del dropdown
+  const filteredCategories = useMemo(() => {
+    if (!categorySearchQuery.trim()) return allCategories;
+    const q = categorySearchQuery.toLowerCase().trim();
+    return allCategories.filter(
+      (c) => c.label.toLowerCase().includes(q) || c.id.toLowerCase().includes(q)
+    );
+  }, [allCategories, categorySearchQuery]);
 
   // Modo edición / creación
   const [isEditing, setIsEditing] = useState(false);
@@ -179,8 +262,14 @@ export function AdminServicesModal({
   }
 
   const filteredServices = services.filter((s) => {
-    const matchesCat = selectedCategory === 'ALL' || s.category === selectedCategory;
-    const matchesSearch = !searchQuery || s.name.toLowerCase().includes(searchQuery.toLowerCase()) || s.description.toLowerCase().includes(searchQuery.toLowerCase());
+    const matchesCat =
+      selectedCategory === 'ALL' ||
+      s.category === selectedCategory ||
+      normalizeCategoryId(s.category) === normalizeCategoryId(selectedCategory);
+    const matchesSearch =
+      !searchQuery ||
+      s.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      s.description.toLowerCase().includes(searchQuery.toLowerCase());
     return matchesCat && matchesSearch;
   });
 
@@ -263,7 +352,7 @@ export function AdminServicesModal({
                   className="w-full h-10 px-3 rounded-xl border border-pretty-pink-200 bg-white text-xs font-medium focus:ring-1 focus:ring-pretty-pink-400 focus:outline-none"
                 >
                   {CATEGORIES.map((cat) => (
-                    <option key={cat} value={cat}>{cat}</option>
+                    <option key={cat.id} value={cat.id}>{cat.label}</option>
                   ))}
                 </select>
               </div>
@@ -383,45 +472,174 @@ export function AdminServicesModal({
           </form>
         ) : (
           <div className="mt-3 flex-1 flex flex-col min-h-0">
-            {/* Barra de Búsqueda y Filtro de Categoría */}
-            <div className="flex flex-col sm:flex-row gap-2 mb-3">
+            {/* Barra de Búsqueda y Dropdown de Categorías */}
+            <div className="flex flex-col sm:flex-row gap-2 mb-3 relative z-30">
+              {/* Buscador de Servicios */}
               <div className="relative flex-1">
                 <Search className="w-3.5 h-3.5 absolute left-3 top-3 text-pretty-wine-600/60" />
                 <input
                   type="text"
-                  placeholder="Buscar servicio..."
+                  placeholder="Buscar servicio por nombre o detalle..."
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
-                  className="w-full h-9 pl-9 pr-3 rounded-xl border border-pretty-pink-200 bg-white text-xs font-medium focus:ring-1 focus:ring-pretty-pink-400 focus:outline-none"
+                  className="w-full h-9 pl-9 pr-8 rounded-xl border border-pretty-pink-200 bg-white text-xs font-medium focus:ring-1 focus:ring-pretty-pink-400 focus:outline-none text-pretty-wine-900"
                 />
-              </div>
-
-              <div className="flex items-center space-x-1 overflow-x-auto pb-1 sm:pb-0">
-                <button
-                  type="button"
-                  onClick={() => setSelectedCategory('ALL')}
-                  className={`px-2.5 py-1.5 rounded-lg text-xs font-semibold transition-all ${
-                    selectedCategory === 'ALL'
-                      ? 'bg-pretty-wine-900 text-white'
-                      : 'bg-white/70 text-pretty-wine-800 hover:bg-white'
-                  }`}
-                >
-                  Todas
-                </button>
-                {CATEGORIES.map((cat) => (
+                {searchQuery && (
                   <button
                     type="button"
-                    key={cat}
-                    onClick={() => setSelectedCategory(cat)}
-                    className={`px-2.5 py-1.5 rounded-lg text-xs font-semibold transition-all whitespace-nowrap ${
-                      selectedCategory === cat
-                        ? 'bg-pretty-wine-900 text-white'
-                        : 'bg-white/70 text-pretty-wine-800 hover:bg-white'
-                    }`}
+                    onClick={() => setSearchQuery('')}
+                    className="absolute right-2.5 top-2.5 p-0.5 rounded-full text-pretty-wine-400 hover:text-pretty-wine-700 transition-colors"
+                    title="Limpiar búsqueda"
                   >
-                    {cat}
+                    <X className="w-3.5 h-3.5" />
                   </button>
-                ))}
+                )}
+              </div>
+
+              {/* Dropdown de Categorías con Search Bar */}
+              <div className="relative" ref={categoryDropdownRef}>
+                <button
+                  type="button"
+                  onClick={() => setIsCategoryDropdownOpen((prev) => !prev)}
+                  className={`w-full sm:w-auto h-9 px-3 rounded-xl border flex items-center justify-between sm:justify-start space-x-2 text-xs font-semibold transition-all shadow-xs ${
+                    isCategoryDropdownOpen
+                      ? 'bg-white border-pretty-wine-900 ring-2 ring-pretty-wine-900/10'
+                      : selectedCategory !== 'ALL'
+                      ? 'bg-pretty-pink-50 border-pretty-pink-300 text-pretty-wine-900'
+                      : 'bg-white/80 border-pretty-pink-200 hover:bg-white text-pretty-wine-900'
+                  }`}
+                >
+                  <div className="flex items-center space-x-1.5 truncate">
+                    <Tag className="w-3.5 h-3.5 text-pretty-pink-500 flex-shrink-0" />
+                    <span className="truncate max-w-[130px] sm:max-w-none">
+                      {selectedCategory === 'ALL' ? 'Todas las categorías' : getCategoryLabel(selectedCategory)}
+                    </span>
+                  </div>
+
+                  <div className="flex items-center space-x-1 flex-shrink-0">
+                    <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-pretty-pink-100/90 text-pretty-wine-800 font-bold">
+                      {selectedCategory === 'ALL'
+                        ? services.length
+                        : categoryCounts.get(normalizeCategoryId(selectedCategory)) || 0}
+                    </span>
+                    <ChevronDown
+                      className={`w-3.5 h-3.5 text-pretty-wine-700 transition-transform duration-200 ${
+                        isCategoryDropdownOpen ? 'rotate-180 text-pretty-wine-900' : ''
+                      }`}
+                    />
+                  </div>
+                </button>
+
+                {/* Popover del Dropdown con Search Bar Integrado */}
+                {isCategoryDropdownOpen && (
+                  <div className="absolute left-0 sm:right-0 sm:left-auto top-full mt-1.5 w-64 max-w-[calc(100vw-2.5rem)] bg-white rounded-2xl p-2.5 shadow-2xl border border-pretty-pink-200 z-50 animate-fade-in">
+                    {/* Search bar para filtrar las categorías */}
+                    <div className="relative mb-2">
+                      <Search className="w-3 h-3 absolute left-2.5 top-2.5 text-pretty-wine-500" />
+                      <input
+                        type="text"
+                        autoFocus
+                        placeholder="Buscar categoría..."
+                        value={categorySearchQuery}
+                        onChange={(e) => setCategorySearchQuery(e.target.value)}
+                        className="w-full h-8 pl-7 pr-7 text-xs rounded-xl border border-pretty-pink-200 bg-pretty-pink-50/50 focus:bg-white focus:outline-none focus:ring-1 focus:ring-pretty-pink-400 text-pretty-wine-900"
+                      />
+                      {categorySearchQuery && (
+                        <button
+                          type="button"
+                          onClick={() => setCategorySearchQuery('')}
+                          className="absolute right-2 top-2 p-0.5 rounded-full text-pretty-wine-400 hover:text-pretty-wine-700 transition-colors"
+                        >
+                          <X className="w-3 h-3" />
+                        </button>
+                      )}
+                    </div>
+
+                    {/* Lista de categorías */}
+                    <div className="max-h-52 overflow-y-auto space-y-1 pr-0.5">
+                      {/* Opción: Todas las Categorías */}
+                      {!categorySearchQuery.trim() && (
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setSelectedCategory('ALL');
+                            setIsCategoryDropdownOpen(false);
+                          }}
+                          className={`w-full px-2.5 py-1.5 rounded-xl text-left flex items-center justify-between text-xs transition-all ${
+                            selectedCategory === 'ALL'
+                              ? 'bg-pretty-wine-900 text-white font-bold shadow-xs'
+                              : 'text-pretty-wine-900 hover:bg-pretty-pink-50'
+                          }`}
+                        >
+                          <div className="flex items-center space-x-2 truncate">
+                            <Sparkles className="w-3.5 h-3.5 text-pretty-pink-400 flex-shrink-0" />
+                            <span className="truncate">Todas las categorías</span>
+                          </div>
+                          <div className="flex items-center space-x-1.5 flex-shrink-0 ml-2">
+                            <span
+                              className={`text-[10px] px-1.5 py-0.5 rounded-full font-bold ${
+                                selectedCategory === 'ALL'
+                                  ? 'bg-white/20 text-white'
+                                  : 'bg-pretty-pink-100 text-pretty-wine-800'
+                              }`}
+                            >
+                              {services.length}
+                            </span>
+                            {selectedCategory === 'ALL' && (
+                              <Check className="w-3.5 h-3.5 text-pretty-pink-300" />
+                            )}
+                          </div>
+                        </button>
+                      )}
+
+                      {/* Categorías filtradas por la search bar interna */}
+                      {filteredCategories.length === 0 ? (
+                        <div className="py-4 text-center text-xs text-pretty-wine-700/60">
+                          No se encontraron categorías
+                        </div>
+                      ) : (
+                        filteredCategories.map((c) => {
+                          const isSelected =
+                            selectedCategory === c.id ||
+                            normalizeCategoryId(selectedCategory) === c.id;
+                          const count = categoryCounts.get(c.id) || 0;
+                          return (
+                            <button
+                              type="button"
+                              key={c.id}
+                              onClick={() => {
+                                setSelectedCategory(c.id);
+                                setIsCategoryDropdownOpen(false);
+                                setCategorySearchQuery('');
+                              }}
+                              className={`w-full px-2.5 py-1.5 rounded-xl text-left flex items-center justify-between text-xs transition-all ${
+                                isSelected
+                                  ? 'bg-pretty-wine-900 text-white font-bold shadow-xs'
+                                  : 'text-pretty-wine-900 hover:bg-pretty-pink-50'
+                              }`}
+                            >
+                              <span className="truncate font-medium">{c.label}</span>
+                              <div className="flex items-center space-x-1.5 flex-shrink-0 ml-2">
+                                <span
+                                  className={`text-[10px] px-1.5 py-0.5 rounded-full font-bold ${
+                                    isSelected
+                                      ? 'bg-white/20 text-white'
+                                      : 'bg-pretty-pink-100 text-pretty-wine-800'
+                                  }`}
+                                >
+                                  {count}
+                                </span>
+                                {isSelected && (
+                                  <Check className="w-3.5 h-3.5 text-pretty-pink-300" />
+                                )}
+                              </div>
+                            </button>
+                          );
+                        })
+                      )}
+                    </div>
+                  </div>
+                )}
               </div>
             </div>
 

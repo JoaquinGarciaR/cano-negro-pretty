@@ -28,9 +28,14 @@ adminRouter.get('/bookings', async (req, res) => {
     const user = req.user!;
 
     // Si es personal regular, sólo puede ver su propia agenda (la propietaria OWNER ve todas o filtra por estilista)
-    const rawProfId = typeof professionalId === 'string' && professionalId !== 'ALL' && professionalId.trim() !== ''
-      ? professionalId.trim()
-      : undefined;
+    const rawProfId =
+      typeof professionalId === 'string' &&
+      professionalId !== 'ALL' &&
+      professionalId !== 'undefined' &&
+      professionalId !== 'null' &&
+      professionalId.trim() !== ''
+        ? professionalId.trim()
+        : undefined;
 
     const filterProfessionalId = user.role === 'STAFF' && user.professionalId
       ? user.professionalId
@@ -55,8 +60,16 @@ adminRouter.get('/bookings', async (req, res) => {
       }
     }
 
-    if (status && typeof status === 'string' && Object.values(BookingStatus).includes(status as any)) {
-      whereClause.status = status as BookingStatus;
+    const rawStatus =
+      typeof status === 'string' &&
+      status !== 'ALL' &&
+      status !== 'undefined' &&
+      status !== 'null'
+        ? status.trim()
+        : undefined;
+
+    if (rawStatus && Object.values(BookingStatus).includes(rawStatus as any)) {
+      whereClause.status = rawStatus as BookingStatus;
     }
 
     if (startDate && endDate && typeof startDate === 'string' && typeof endDate === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(startDate) && /^\d{4}-\d{2}-\d{2}$/.test(endDate)) {
@@ -439,6 +452,27 @@ adminRouter.post('/push/subscribe', async (req, res) => {
     res.json({ message: 'Suscripción push registrada correctamente' });
   } catch (error: any) {
     res.status(500).json({ error: 'Error al registrar suscripción push' });
+  }
+});
+
+/**
+ * Desuscribir dispositivo de Web Push al cerrar sesión o desactivar alertas
+ */
+adminRouter.post('/push/unsubscribe', async (req, res) => {
+  try {
+    const { endpoint } = req.body;
+    if (endpoint) {
+      await prisma.pushSubscription.deleteMany({
+        where: { endpoint, userId: req.user!.id }
+      });
+    } else {
+      await prisma.pushSubscription.deleteMany({
+        where: { userId: req.user!.id }
+      });
+    }
+    res.json({ message: 'Suscripción push cancelada correctamente' });
+  } catch (error: any) {
+    res.status(500).json({ error: 'Error al cancelar suscripción push' });
   }
 });
 

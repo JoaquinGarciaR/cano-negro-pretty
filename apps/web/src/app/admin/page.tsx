@@ -46,7 +46,7 @@ import {
   fetchAdminAvailability,
   assignBookingApi
 } from '../../lib/api';
-import { playNotificationSound, showBrowserNotification, requestNotificationPermission } from '../../lib/sound';
+import { playNotificationSound, showBrowserNotification, requestNotificationPermission, unsubscribeUserFromPush } from '../../lib/sound';
 import { WhatsAppModal } from '../../components/WhatsAppModal';
 import { BlockTimeModal } from '../../components/BlockTimeModal';
 import { DayAvailabilityModal } from '../../components/DayAvailabilityModal';
@@ -82,8 +82,10 @@ export default function AdminDashboardPage() {
   const [agendaViewMode, setAgendaViewMode] = useState<'calendar' | 'list'>('calendar');
   const [agendaCalendarMonth, setAgendaCalendarMonth] = useState<Date>(new Date());
 
-  // Filtros de agenda
-  const [filterDate, setFilterDate] = useState<string>(new Date().toISOString().split('T')[0]);
+  // Filtros de agenda (fecha actual en Costa Rica)
+  const [filterDate, setFilterDate] = useState<string>(() => {
+    return new Intl.DateTimeFormat('en-CA', { timeZone: 'America/Costa_Rica' }).format(new Date());
+  });
   const [filterProfessionalId, setFilterProfessionalId] = useState<string>('');
   const [filterStatus, setFilterStatus] = useState<string>('ALL');
 
@@ -261,10 +263,10 @@ export default function AdminDashboardPage() {
 
       // Disparar audio chime cristalino y notificación push
       showBrowserNotification(`Trabajo asignado a ${profName}`, {
-        body: `Cita #${targetBooking?.referenceCode || ''} para ${targetBooking?.clientName || 'Cliente'} asignada a ${profName}.`
+        body: `Cita #${targetBooking?.referenceCode || ''} para ${targetBooking?.clientName || 'Cliente'} asignada a ${profName}. Pendiente de confirmación.`
       });
 
-      setActionSuccess(`Cita asignada exitosamente a ${profName}.`);
+      setActionSuccess(`Esteticista asignada (${profName}). La cita permanece pendiente y ya puedes confirmarla.`);
       loadData();
     } catch (err: any) {
       setActionError(err.message || 'Error al asignar la cita');
@@ -281,6 +283,12 @@ export default function AdminDashboardPage() {
     setActionSuccess(null);
 
     try {
+      const targetB = bookings.find((b) => b.id === bookingId);
+      if (newStatus === 'CONFIRMED' && !targetB?.professionalId) {
+        setActionError('Debes asignar una esteticista antes de poder confirmar la cita.');
+        return;
+      }
+
       await updateBookingStatusApi(bookingId, newStatus, undefined, authToken);
       setActionSuccess(`Reserva actualizada a estado: ${newStatus}`);
       
@@ -299,7 +307,12 @@ export default function AdminDashboardPage() {
     }
   }
 
-  function handleLogout() {
+  async function handleLogout() {
+    try {
+      if (authToken) {
+        await unsubscribeUserFromPush(authToken);
+      }
+    } catch (_) {}
     localStorage.removeItem('cnp_auth_token');
     localStorage.removeItem('cnp_auth_user');
     router.push('/admin/login');
@@ -319,13 +332,12 @@ export default function AdminDashboardPage() {
     return bookings.filter((b) => b.status === 'PENDING');
   }, [bookings]);
 
-  // Citas agrupadas por fecha para el Calendario Visual
+  // Citas agrupadas por fecha para el Calendario Visual (en hora de Costa Rica)
   const bookingsByDate = useMemo(() => {
     const map = new Map<string, any[]>();
+    const dtf = new Intl.DateTimeFormat('en-CA', { timeZone: 'America/Costa_Rica' });
     for (const b of bookings) {
-      // Extraer fecha en hora local de Costa Rica
-      const d = new Date(b.startTime);
-      const dateKey = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+      const dateKey = dtf.format(new Date(b.startTime));
       if (!map.has(dateKey)) {
         map.set(dateKey, []);
       }
@@ -516,7 +528,7 @@ export default function AdminDashboardPage() {
 
             {/* Filtro Dropdown por Estilista para la Propietaria */}
             {currentUser?.role === 'OWNER' && (
-              <div className="flex items-center justify-between gap-2 p-2 rounded-2xl bg-white/70 border border-white/90">
+              <div className="flex items-center justify-between gap-2 p-2 rounded-2xl bg-white/70 border border-white/90 relative z-20">
                 <div className="flex items-center space-x-2">
                   <span className="text-[11px] font-bold text-pretty-wine-700/80 flex items-center space-x-1 pl-1">
                     <User className="w-3.5 h-3.5 text-pretty-pink-500" />
@@ -533,6 +545,7 @@ export default function AdminDashboardPage() {
                     unassignedSublabel="Pendientes de asignación"
                     headerTitle="Filtrar Solicitudes"
                     title="Filtrar solicitudes por estilista"
+                    align="left"
                   />
                 </div>
 
@@ -711,11 +724,23 @@ export default function AdminDashboardPage() {
                           </button>
 
                           <button
-                            onClick={() => handleStatusChange(b.id, 'CONFIRMED')}
-                            className="inline-flex items-center space-x-1.5 px-3.5 py-1.5 rounded-full text-xs font-bold text-white bg-pretty-wine-900 hover:bg-pretty-pink-600 shadow-sm active:scale-95"
+                            disabled={isUnassigned}
+                            onClick={() => {
+                              if (isUnassigned) {
+                                setActionError('Debes asignar una esteticista antes de poder confirmar la cita.');
+                                return;
+                              }
+                              handleStatusChange(b.id, 'CONFIRMED');
+                            }}
+                            title={isUnassigned ? 'Asigna primero una esteticista para habilitar la confirmación' : 'Confirmar Cita'}
+                            className={`inline-flex items-center space-x-1.5 px-3.5 py-1.5 rounded-full text-xs font-bold transition-all shadow-sm ${
+                              isUnassigned
+                                ? 'bg-gray-100 text-gray-400 border border-gray-200 cursor-not-allowed opacity-75'
+                                : 'text-white bg-pretty-wine-900 hover:bg-pretty-pink-600 active:scale-95'
+                            }`}
                           >
                             <CheckCircle2 className="w-3.5 h-3.5" />
-                            <span>Confirmar Cita</span>
+                            <span>{isUnassigned ? 'Requiere Asignar' : 'Confirmar Cita'}</span>
                           </button>
                         </div>
                       </div>
@@ -733,7 +758,7 @@ export default function AdminDashboardPage() {
           <div className="space-y-4">
             
             {/* Barra de Controles y Selector de Modo de Vista */}
-            <div className="glass-panel rounded-2xl p-3 sm:p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+            <div className="glass-panel rounded-2xl p-3 sm:p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3 relative z-20">
               <div>
                 <div className="flex items-center space-x-2">
                   <h3 className="font-serif text-base sm:text-lg font-bold text-pretty-wine-900">
@@ -752,7 +777,7 @@ export default function AdminDashboardPage() {
                 </p>
               </div>
 
-              <div className="flex flex-wrap items-center gap-2 self-start sm:self-auto">
+              <div className="flex items-center justify-between gap-1.5 w-full sm:w-auto">
                 {/* Selector Elegante de Estilista para la Propietaria (Custom Pretty Dropdown) */}
                 {currentUser?.role === 'OWNER' && (
                   <StylistDropdown
@@ -765,38 +790,39 @@ export default function AdminDashboardPage() {
                     unassignedSublabel="Citas pendientes de asignación"
                     headerTitle="Filtrar Citas del Salón"
                     title="Filtrar agenda por estilista"
+                    align="left"
                   />
                 )}
 
                 {/* Toggle de Subvista */}
-                <div className="flex items-center space-x-1 p-1 rounded-2xl bg-pretty-pink-100/70 border border-pretty-pink-200/60">
-                <button
-                  type="button"
-                  onClick={() => setAgendaViewMode('calendar')}
-                  className={`inline-flex items-center space-x-1.5 px-3 py-1.5 rounded-xl text-xs font-bold transition-all ${
-                    agendaViewMode === 'calendar'
-                      ? 'bg-pretty-wine-900 text-white shadow-sm'
-                      : 'text-pretty-wine-900 hover:bg-white/60'
-                  }`}
-                >
-                  <Calendar className="w-3.5 h-3.5" />
-                  <span>Calendario Visual</span>
-                </button>
+                <div className="flex items-center space-x-0.5 p-1 rounded-2xl bg-pretty-pink-100/70 border border-pretty-pink-200/60 flex-shrink-0">
+                  <button
+                    type="button"
+                    onClick={() => setAgendaViewMode('calendar')}
+                    className={`inline-flex items-center space-x-1 px-2.5 py-1.5 rounded-xl text-xs font-bold transition-all ${
+                      agendaViewMode === 'calendar'
+                        ? 'bg-pretty-wine-900 text-white shadow-sm'
+                        : 'text-pretty-wine-900 hover:bg-white/60'
+                    }`}
+                  >
+                    <Calendar className="w-3.5 h-3.5" />
+                    <span>Calendario<span className="hidden md:inline"> Visual</span></span>
+                  </button>
 
-                <button
-                  type="button"
-                  onClick={() => setAgendaViewMode('list')}
-                  className={`inline-flex items-center space-x-1.5 px-3 py-1.5 rounded-xl text-xs font-bold transition-all ${
-                    agendaViewMode === 'list'
-                      ? 'bg-pretty-wine-900 text-white shadow-sm'
-                      : 'text-pretty-wine-900 hover:bg-white/60'
-                  }`}
-                >
-                  <ListFilter className="w-3.5 h-3.5" />
-                  <span>Lista por Rango</span>
-                </button>
+                  <button
+                    type="button"
+                    onClick={() => setAgendaViewMode('list')}
+                    className={`inline-flex items-center space-x-1 px-2.5 py-1.5 rounded-xl text-xs font-bold transition-all ${
+                      agendaViewMode === 'list'
+                        ? 'bg-pretty-wine-900 text-white shadow-sm'
+                        : 'text-pretty-wine-900 hover:bg-white/60'
+                    }`}
+                  >
+                    <ListFilter className="w-3.5 h-3.5" />
+                    <span>Lista<span className="hidden md:inline"> por Rango</span></span>
+                  </button>
+                </div>
               </div>
-            </div>
             </div>
 
             {/* SUBVISTA 1: CALENDARIO VISUAL INTERACTIVO */}
@@ -1273,7 +1299,7 @@ export default function AdminDashboardPage() {
         {/* TAB 3: APERTURA DE AGENDA Y DESBLOQUEO DE FECHAS */}
         {activeTab === 'availability' && (
           <div className="space-y-4">
-            <div className="glass-panel rounded-2xl p-3.5 sm:p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+            <div className="glass-panel rounded-2xl p-3.5 sm:p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3 relative z-20">
               <div>
                 <h3 className="font-serif text-base sm:text-lg font-bold text-pretty-wine-900">
                   Apertura y Desbloqueo de Citas a Futuro
@@ -1285,18 +1311,18 @@ export default function AdminDashboardPage() {
 
               <div className="flex items-center space-x-2">
                 {currentUser?.role === 'OWNER' && (
-                  <select
+                  <StylistDropdown
                     value={filterProfessionalId}
-                    onChange={(e) => setFilterProfessionalId(e.target.value)}
-                    className="px-3 py-1.5 rounded-xl border border-pretty-pink-200 bg-white text-xs font-semibold text-pretty-wine-900"
-                  >
-                    <option value="">Todas las estilistas</option>
-                    {catalog?.professionals?.map((p: any) => (
-                      <option key={p.id} value={p.id}>
-                        {p.name}
-                      </option>
-                    ))}
-                  </select>
+                    onChange={setFilterProfessionalId}
+                    professionals={catalog?.professionals || []}
+                    allLabel="Todas las estilistas"
+                    allSublabel="Horarios globales del salón"
+                    showUnassigned={false}
+                    headerTitle="Filtrar Apertura"
+                    title="Filtrar horarios por estilista"
+                    searchPlaceholder="Buscar estilista..."
+                    align="left"
+                  />
                 )}
 
                 <button
@@ -1304,7 +1330,7 @@ export default function AdminDashboardPage() {
                     setSelectedDateForAvail(undefined);
                     setIsDayAvailOpen(true);
                   }}
-                  className="inline-flex items-center space-x-1 px-3.5 py-1.5 rounded-full text-xs font-bold text-white bg-pretty-wine-900 hover:bg-pretty-pink-600 transition-all shadow-sm"
+                  className="inline-flex items-center space-x-1 px-3.5 py-1.5 rounded-full text-xs font-bold text-white bg-pretty-wine-900 hover:bg-pretty-pink-600 transition-all shadow-sm flex-shrink-0"
                 >
                   <Unlock className="w-3.5 h-3.5" />
                   <span>Apertura de Días</span>
@@ -1393,6 +1419,7 @@ export default function AdminDashboardPage() {
         onClose={() => setIsManualBookingOpen(false)}
         catalog={catalog}
         token={authToken}
+        activeTab={activeTab}
         onSuccess={() => {
           loadData();
           setActionSuccess('Cita manual registrada y asignada correctamente.');

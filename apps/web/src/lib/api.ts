@@ -79,11 +79,26 @@ export async function fetchAdminBookings(
   token?: string,
   filters?: { status?: string; professionalId?: string; date?: string; startDate?: string; endDate?: string }
 ) {
-  const query = new URLSearchParams(filters as any);
+  const query = new URLSearchParams();
+  if (filters) {
+    for (const [key, val] of Object.entries(filters)) {
+      if (
+        val !== undefined &&
+        val !== null &&
+        val !== '' &&
+        val !== 'undefined' &&
+        val !== 'null' &&
+        val !== 'ALL'
+      ) {
+        query.set(key, String(val));
+      }
+    }
+  }
+  const queryStr = query.toString() ? `?${query.toString()}` : '';
   const headers: Record<string, string> = {};
   if (token) headers['Authorization'] = `Bearer ${token}`;
 
-  const res = await fetch(`${API_URL}/admin/bookings?${query.toString()}`, {
+  const res = await fetch(`${API_URL}/admin/bookings${queryStr}`, {
     headers,
     credentials: 'include',
     cache: 'no-store'

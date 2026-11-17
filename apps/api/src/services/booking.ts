@@ -6,7 +6,7 @@ import {
   UpdateBookingStatusInput,
   normalizePhone
 } from '@cano/shared';
-import { sendPushToSalon, sendPushToUser } from './push';
+import { sendPushToSalon, sendPushToUser, sendPushToProfessional, sendPushToOwners } from './push';
 
 function generateReferenceCode(): string {
   const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
@@ -146,12 +146,28 @@ export async function createBooking(input: CreateBookingInput) {
     }
   });
 
-  // 5. Emitir Web Push a los dispositivos suscritos de las esteticistas
-  sendPushToSalon(business.id, {
-    title: professionalId ? 'Nueva Cita Asignada' : 'Nueva Solicitud Entrante',
-    body: `${clientName} ha solicitado ${serviceName}. Revisa tu bandeja de solicitudes.`,
-    url: '/admin'
-  }).catch((e) => console.warn('Error al emitir web push al salón:', e));
+  // 5. Emitir Web Push segmentado exclusivamente a las usuarias autenticadas correspondientes
+  if (professionalId) {
+    // Si la cita se solicitó con una esteticista específica, alertar a esa esteticista y a la dueña
+    sendPushToProfessional(professionalId, {
+      title: 'Nueva Cita Solicitada',
+      body: `${clientName} ha solicitado ${serviceName}. Revisa tu agenda.`,
+      url: '/admin'
+    }).catch((e) => console.warn('Error push esteticista:', e));
+
+    sendPushToOwners(business.id, {
+      title: 'Nueva Cita en el Salón',
+      body: `${clientName} solicitó ${serviceName} con especialista asignada.`,
+      url: '/admin'
+    }).catch((e) => console.warn('Error push propietaria:', e));
+  } else {
+    // Si no tiene especialista asignada, alertar a todo el equipo para reclamar en bandeja compartida
+    sendPushToSalon(business.id, {
+      title: 'Nueva Solicitud Sin Asignar',
+      body: `${clientName} ha solicitado ${serviceName}. Disponible en bandeja para tomarla.`,
+      url: '/admin'
+    }).catch((e) => console.warn('Error al emitir web push al salón:', e));
+  }
 
   return booking;
 }
@@ -223,7 +239,7 @@ export async function createManualBooking(input: CreateManualBookingInput, creat
   const endTime = new Date(startTime.getTime() + durationMinutes * 60000);
 
   // Verificación atómica de espacio libre
-  return await prisma.$transaction(async (tx) => {
+  const result = await prisma.$transaction(async (tx) => {
     const bufferMinutes = modality === 'HOME_VISIT' ? business.homeVisitBufferMinutes : 0;
     const windowStart = new Date(startTime.getTime() - bufferMinutes * 60000);
     const windowEnd = new Date(endTime.getTime() + bufferMinutes * 60000);
@@ -319,6 +335,16 @@ export async function createManualBooking(input: CreateManualBookingInput, creat
 
     return booking;
   });
+
+  if (result.professionalId) {
+    sendPushToProfessional(result.professionalId, {
+      title: 'Cita en tu Agenda',
+      body: `Te han asignado la cita #${result.referenceCode} para ${result.clientName} (${result.snapshotServiceName}).`,
+      url: '/admin'
+    }).catch((e) => console.warn('Error push cita manual:', e));
+  }
+
+  return result;
 }
 
 /**
@@ -330,7 +356,7 @@ export async function assignBooking(
   assignedByUserId?: string,
   staffNotes?: string
 ) {
-  return await prisma.$transaction(async (tx) => {
+  const updated = await prisma.$transaction(async (tx) => {
     const booking = await tx.booking.findUnique({
       where: { id: bookingId },
       include: {
@@ -371,7 +397,6 @@ export async function assignBooking(
       where: { id: bookingId },
       data: {
         professionalId,
-        status: BookingStatus.CONFIRMED,
         staffNotes: staffNotes || booking.staffNotes
       },
       include: {
@@ -385,7 +410,7 @@ export async function assignBooking(
         bookingId: booking.id,
         userId: assignedByUserId || null,
         action: `ASSIGNED_TO_${professionalId}`,
-        details: `Cita asignada a ${updated.professional?.name} y confirmada.`
+        details: `Cita asignada a ${updated.professional?.name}. Pendiente de confirmación.`
       }
     });
 
@@ -401,6 +426,15 @@ export async function assignBooking(
 
     return updated;
   });
+
+  // Notificación Push a la profesional asignada
+  sendPushToProfessional(professionalId, {
+    title: 'Nueva Cita Asignada',
+    body: `Se te ha asignado la cita #${updated.referenceCode} con ${updated.clientName} (${updated.snapshotServiceName}).`,
+    url: '/admin'
+  }).catch((e) => console.warn('Error push asignación:', e));
+
+  return updated;
 }
 
 /**
@@ -413,7 +447,7 @@ export async function updateBookingStatus(
 ) {
   const { status, staffNotes, professionalId } = input;
 
-  return await prisma.$transaction(async (tx) => {
+  const updated = await prisma.$transaction(async (tx) => {
     const booking = await tx.booking.findUnique({
       where: { id: bookingId },
       include: {
@@ -430,7 +464,7 @@ export async function updateBookingStatus(
 
     if (status === BookingStatus.CONFIRMED) {
       if (!targetProfId) {
-        throw new Error('Para confirmar la cita debe asignar una esteticista responsable');
+        throw new Error('Para confirmar la cita debe asignar primero una esteticista responsable');
       }
 
       const bufferMinutes = booking.modality === Modality.HOME_VISIT
@@ -460,6 +494,15 @@ export async function updateBookingStatus(
       }
     }
 
+    if (status === BookingStatus.COMPLETED) {
+      if (!targetProfId) {
+        throw new Error('Para completar la cita debe haber una esteticista asignada');
+      }
+      if (booking.status !== BookingStatus.CONFIRMED) {
+        throw new Error('La cita debe estar previamente confirmada para poder completarse');
+      }
+    }
+
     const updated = await tx.booking.update({
       where: { id: bookingId },
       data: {
@@ -484,4 +527,20 @@ export async function updateBookingStatus(
 
     return updated;
   });
+
+  if (status === BookingStatus.CANCELLED && updated.professionalId) {
+    sendPushToProfessional(updated.professionalId, {
+      title: 'Cita Cancelada',
+      body: `La cita #${updated.referenceCode} para ${updated.clientName} ha sido cancelada.`,
+      url: '/admin'
+    }).catch((e) => console.warn('Error push cancelación:', e));
+  } else if (status === BookingStatus.CONFIRMED && updated.professionalId) {
+    sendPushToProfessional(updated.professionalId, {
+      title: 'Cita Confirmada',
+      body: `Cita #${updated.referenceCode} de ${updated.clientName} está confirmada.`,
+      url: '/admin'
+    }).catch((e) => console.warn('Error push confirmación:', e));
+  }
+
+  return updated;
 }

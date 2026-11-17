@@ -140,8 +140,19 @@ test.describe('Caño Negro Pretty - Mobile Layout & Responsiveness (iPhone 14 Vi
     if (await slotBtn.isVisible({ timeout: 2000 }).catch(() => false)) {
       await slotBtn.click({ force: true });
       await page.click('button:has-text("Confirmar Cita")');
+      await expect(page.getByRole('heading', { name: 'Ingresar Cita Manual' })).not.toBeVisible({ timeout: 10000 });
+
+      // Verificar que tras crear la cita con éxito, el formulario se haya limpiado
+      await manualBtn.click({ force: true });
+      await expect(page.locator('input[placeholder*="Sofía Chaves"]')).toHaveValue('');
+      await page.click('button:has-text("Cancelar")');
     } else {
-      // Si la fecha actual no tiene turnos libres, cerrar modal limpiamente
+      // Si la fecha actual no tiene turnos libres, probar preservación y botón de limpiar borrador
+      await page.click('button:has-text("Cancelar")');
+      await manualBtn.click({ force: true });
+      await expect(page.locator('input[placeholder*="Sofía Chaves"]')).toHaveValue('Mariana Manual Playwright');
+      await page.click('button:has-text("Limpiar formulario")');
+      await expect(page.locator('input[placeholder*="Sofía Chaves"]')).toHaveValue('');
       await page.click('button:has-text("Cancelar")');
     }
     await expect(page.getByRole('heading', { name: 'Ingresar Cita Manual' })).not.toBeVisible({ timeout: 10000 });
@@ -258,6 +269,18 @@ test.describe('Caño Negro Pretty - Mobile Layout & Responsiveness (iPhone 14 Vi
     await page.click('button:has-text("Gestión de Servicios")');
     await expect(page.getByRole('heading', { name: 'Servicios del Salón' })).toBeVisible();
     await expect(page.locator('button:has-text("Nuevo Servicio")')).toBeVisible();
+
+    // 5. Verificar Dropdown de Categorías con barra de búsqueda interna
+    const catDropdownBtn = page.locator('button:has-text("Todas las categorías")');
+    await expect(catDropdownBtn).toBeVisible();
+    await catDropdownBtn.click();
+    const catSearchInput = page.locator('input[placeholder="Buscar categoría..."]');
+    await expect(catSearchInput).toBeVisible();
+    await catSearchInput.fill('Uñ');
+    const unasOption = page.locator('.space-y-1 button:has-text("Uñas")').first();
+    await expect(unasOption).toBeVisible();
+    await unasOption.click();
+    await expect(page.locator('button:has-text("Uñas")').first()).toBeVisible();
   });
 
 });

@@ -13,13 +13,15 @@ import {
   ExternalLink,
   Sparkles,
   Send,
-  HelpCircle
+  HelpCircle,
+  BellOff
 } from 'lucide-react';
 import {
   getDeviceEnvironment,
   DevicePushStatus,
   playNotificationSound,
   subscribeUserToPush,
+  unsubscribeUserFromPush,
   triggerPushTest
 } from '../lib/sound';
 
@@ -77,6 +79,29 @@ export function PushNotificationModal({
     } catch (e: any) {
       setFeedbackType('error');
       setFeedbackMessage(e.message || 'Error al solicitar notificaciones');
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  async function handleUnsubscribe() {
+    setLoading(true);
+    setFeedbackMessage(null);
+    try {
+      const ok = await unsubscribeUserFromPush(token);
+      const updatedStatus = getDeviceEnvironment();
+      setDeviceStatus(updatedStatus);
+      if (ok) {
+        setFeedbackType('info');
+        setFeedbackMessage('Notificaciones push desactivadas y desvinculadas de este dispositivo.');
+        onStatusChange?.(false);
+      } else {
+        setFeedbackType('error');
+        setFeedbackMessage('No se pudo cancelar la suscripción.');
+      }
+    } catch (e: any) {
+      setFeedbackType('error');
+      setFeedbackMessage(e.message || 'Error al desactivar notificaciones');
     } finally {
       setLoading(false);
     }
@@ -286,6 +311,18 @@ export function PushNotificationModal({
               <span>Push de Prueba</span>
             </button>
           </div>
+
+          {deviceStatus?.permission === 'granted' && (
+            <button
+              onClick={handleUnsubscribe}
+              disabled={loading}
+              type="button"
+              className="w-full py-2 px-3 rounded-xl bg-gray-50 hover:bg-rose-50 text-pretty-wine-700 hover:text-rose-700 font-medium border border-gray-200 hover:border-rose-200 transition-all flex items-center justify-center space-x-1.5 text-[11px]"
+            >
+              <BellOff className="w-3.5 h-3.5 text-gray-500" />
+              <span>Silenciar / Desvincular este dispositivo</span>
+            </button>
+          )}
 
         </div>
 

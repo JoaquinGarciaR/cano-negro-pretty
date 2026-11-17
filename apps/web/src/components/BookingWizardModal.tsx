@@ -233,7 +233,9 @@ export function BookingWizardModal({
         <div className="mb-4 pr-8">
           <div className="flex items-center space-x-1.5 text-xs font-semibold text-pretty-pink-600 uppercase tracking-wider mb-1">
             <Sparkles className="w-3.5 h-3.5" />
-            <span>Reserva en Línea · Paso {step} de 5</span>
+            <span>
+              {step <= 5 ? `Reserva en Línea · Paso ${step} de 5` : 'Reserva en Línea · Confirmación'}
+            </span>
           </div>
           <h3 className="font-serif text-xl sm:text-2xl font-bold text-pretty-wine-900 leading-tight">
             {step === 1 && 'Selecciona tu Servicio'}
@@ -243,6 +245,22 @@ export function BookingWizardModal({
             {step === 5 && 'Revisa y Confirma'}
             {step === 6 && '¡Solicitud Recibida!'}
           </h3>
+          {step <= 5 && (
+            <div className="flex items-center space-x-1.5 mt-2">
+              {[1, 2, 3, 4, 5].map((s) => (
+                <div
+                  key={s}
+                  className={`h-1 rounded-full transition-all duration-300 ${
+                    s === step
+                      ? 'w-6 bg-pretty-wine-900'
+                      : s < step
+                      ? 'w-3 bg-pretty-pink-400'
+                      : 'w-2 bg-pretty-pink-200'
+                  }`}
+                />
+              ))}
+            </div>
+          )}
         </div>
 
         {/* Contenido según el paso */}

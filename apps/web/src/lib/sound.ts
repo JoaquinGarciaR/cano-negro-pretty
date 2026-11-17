@@ -215,6 +215,37 @@ export async function subscribeUserToPush(token: string): Promise<{ success: boo
 }
 
 /**
+ * Desuscribe el dispositivo del servidor Web Push al cerrar sesión o desactivar alertas
+ */
+export async function unsubscribeUserFromPush(token?: string): Promise<boolean> {
+  if (typeof window === 'undefined' || !('serviceWorker' in navigator)) return false;
+
+  try {
+    const registration = await navigator.serviceWorker.ready;
+    const subscription = await registration.pushManager?.getSubscription();
+    if (subscription) {
+      const endpoint = subscription.endpoint;
+      await subscription.unsubscribe();
+
+      if (token) {
+        await fetch('/api/admin/push/unsubscribe', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${token}`
+          },
+          body: JSON.stringify({ endpoint })
+        }).catch(() => {});
+      }
+    }
+    return true;
+  } catch (err) {
+    console.warn('Error al desuscribir de notificaciones push:', err);
+    return false;
+  }
+}
+
+/**
  * Envía un push de prueba desde el servidor al usuario
  */
 export async function triggerPushTest(token: string): Promise<boolean> {
