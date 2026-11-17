@@ -370,22 +370,22 @@ export function RescheduleModal({
         {/* Botón Cerrar */}
         <button
           onClick={onClose}
-          className="absolute top-5 right-5 p-2 rounded-full bg-white/70 hover:bg-white text-pretty-wine-800 transition-colors shadow-sm"
+          className="absolute top-4 right-4 sm:top-5 sm:right-5 p-2 rounded-full bg-white/80 hover:bg-white text-pretty-wine-800 transition-colors shadow-sm z-10"
           title="Cerrar modal"
         >
           <X className="w-4 h-4" />
         </button>
 
-        {/* Encabezado */}
-        <div className="mb-4">
-          <div className="flex items-center space-x-2 text-xs font-semibold text-pretty-pink-600 uppercase tracking-wider mb-1">
-            <CalendarClock className="w-3.5 h-3.5" />
-            <span>Reprogramación · Caño Negro Pretty</span>
+        {/* Encabezado con padding derecho para evitar que el botón X tape el texto */}
+        <div className="mb-4 pr-10 sm:pr-12">
+          <div className="flex items-center space-x-2 text-xs font-semibold text-pretty-pink-600 uppercase tracking-wider mb-1 truncate">
+            <CalendarClock className="w-3.5 h-3.5 flex-shrink-0" />
+            <span className="truncate">Reprogramación · Caño Negro Pretty</span>
           </div>
-          <h3 className="font-serif text-xl sm:text-2xl font-bold text-pretty-wine-900">
+          <h3 className="font-serif text-xl sm:text-2xl font-bold text-pretty-wine-900 leading-snug">
             Cambio de Fecha y Hora
           </h3>
-          <p className="text-xs text-pretty-wine-800/80 mt-0.5">
+          <p className="text-xs text-pretty-wine-800/80 mt-0.5 leading-relaxed">
             Cita <strong>#{booking.referenceCode}</strong> · Clienta: <strong>{booking.clientName}</strong> ({booking.clientPhone})
           </p>
         </div>

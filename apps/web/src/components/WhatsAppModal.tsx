@@ -142,17 +142,17 @@ export function WhatsAppModal({
         
         <button
           onClick={onClose}
-          className="absolute top-5 right-5 p-2 rounded-full bg-white/70 hover:bg-white text-pretty-wine-800 transition-colors shadow-sm"
+          className="absolute top-4 right-4 sm:top-5 sm:right-5 p-2 rounded-full bg-white/80 hover:bg-white text-pretty-wine-800 transition-colors shadow-sm z-10"
         >
           <X className="w-4 h-4" />
         </button>
 
-        <div className="mb-4">
-          <div className="flex items-center space-x-2 text-xs font-semibold text-pretty-pink-600 uppercase tracking-wider mb-1">
-            <MessageSquare className="w-3.5 h-3.5" />
-            <span>Módulo de WhatsApp · Caño Negro Pretty</span>
+        <div className="mb-4 pr-10 sm:pr-12">
+          <div className="flex items-center space-x-2 text-xs font-semibold text-pretty-pink-600 uppercase tracking-wider mb-1 truncate">
+            <MessageSquare className="w-3.5 h-3.5 flex-shrink-0" />
+            <span className="truncate">Módulo de WhatsApp · Caño Negro Pretty</span>
           </div>
-          <h3 className="font-serif text-xl sm:text-2xl font-bold text-pretty-wine-900">
+          <h3 className="font-serif text-xl sm:text-2xl font-bold text-pretty-wine-900 leading-snug">
             {templateType === 'reschedule'
               ? 'Mensaje de Cambio de Fecha y Hora'
               : templateType === 'reminder'
@@ -161,7 +161,7 @@ export function WhatsAppModal({
               ? 'Mensaje de Cancelación de Cita'
               : 'Mensaje de Confirmación'}
           </h3>
-          <p className="text-xs text-pretty-wine-800/80 mt-0.5">
+          <p className="text-xs text-pretty-wine-800/80 mt-0.5 leading-relaxed">
             Clienta: <strong>{booking.clientName}</strong> ({booking.clientPhone}) · Cita #{booking.referenceCode}
           </p>
         </div>
