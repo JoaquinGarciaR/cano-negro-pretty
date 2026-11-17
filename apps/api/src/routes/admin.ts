@@ -9,10 +9,11 @@ import {
   SetDayAvailabilitySchema,
   BatchOpenDaysSchema,
   CreateManualBookingSchema,
-  AssignBookingSchema
+  AssignBookingSchema,
+  RescheduleBookingSchema
 } from '@cano/shared';
 import { setDayAvailability, batchOpenDays } from '../services/availability';
-import { createManualBooking, assignBooking } from '../services/booking';
+import { createManualBooking, assignBooking, rescheduleBooking } from '../services/booking';
 
 export const adminRouter = Router();
 
@@ -245,6 +246,28 @@ adminRouter.patch('/bookings/:id/assign', async (req, res) => {
     }
     console.error('Error al asignar cita:', error);
     res.status(400).json({ error: error.message || 'Error al asignar la cita' });
+  }
+});
+
+/**
+ * Reprogramar horario de una cita
+ */
+adminRouter.patch('/bookings/:id/reschedule', async (req, res) => {
+  try {
+    const { id } = req.params;
+    const parseResult = RescheduleBookingSchema.safeParse(req.body);
+    if (!parseResult.success) {
+      return res.status(400).json({ error: 'Datos inválidos', details: parseResult.error.errors });
+    }
+
+    const updated = await rescheduleBooking(id, parseResult.data, req.user!.id);
+    res.json({ message: 'Cita reprogramada exitosamente', booking: updated });
+  } catch (error: any) {
+    if (error.code === 'CONFLICT') {
+      return res.status(409).json({ error: error.message });
+    }
+    console.error('Error al reprogramar cita:', error);
+    res.status(400).json({ error: error.message || 'Error al reprogramar la cita' });
   }
 });
 

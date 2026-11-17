@@ -4,6 +4,7 @@ import {
   CreateBookingInput,
   CreateManualBookingInput,
   UpdateBookingStatusInput,
+  RescheduleBookingInput,
   normalizePhone
 } from '@cano/shared';
 import { sendPushToSalon, sendPushToUser, sendPushToProfessional, sendPushToOwners } from './push';
@@ -575,6 +576,133 @@ export async function updateBookingStatus(
       url: '/admin'
     }).catch((e) => console.warn('Error push completado dueñas:', e));
   }
+
+  return updated;
+}
+
+/**
+ * Reprogramar horario de una cita (cambio de fecha y/o hora)
+ */
+export async function rescheduleBooking(
+  bookingId: string,
+  input: RescheduleBookingInput,
+  userId?: string
+) {
+  const { startTime: startTimeISO, professionalId, staffNotes } = input;
+
+  const updated = await prisma.$transaction(async (tx) => {
+    const booking = await tx.booking.findUnique({
+      where: { id: bookingId },
+      include: {
+        business: true,
+        professional: true
+      }
+    });
+
+    if (!booking) {
+      throw new Error('Reserva no encontrada');
+    }
+
+    const targetProfId = professionalId !== undefined ? (professionalId || null) : booking.professionalId;
+    const durationMinutes = booking.snapshotDurationMinutes || 60;
+    const startTime = new Date(startTimeISO);
+    const endTime = new Date(startTime.getTime() + durationMinutes * 60000);
+
+    const bufferMinutes = booking.modality === Modality.HOME_VISIT
+      ? booking.business.homeVisitBufferMinutes
+      : 0;
+
+    const windowStart = new Date(startTime.getTime() - bufferMinutes * 60000);
+    const windowEnd = new Date(endTime.getTime() + bufferMinutes * 60000);
+
+    // Si la cita tiene esteticista asignada (o se le asignó una en el cambio), verificar conflictos
+    if (targetProfId) {
+      const conflictingBooking = await tx.booking.findFirst({
+        where: {
+          id: { not: booking.id },
+          professionalId: targetProfId,
+          status: BookingStatus.CONFIRMED,
+          startTime: { lt: windowEnd },
+          endTime: { gt: windowStart }
+        }
+      });
+
+      if (conflictingBooking) {
+        const error: any = new Error(
+          `Conflicto de horario: La esteticista ya tiene la cita #${conflictingBooking.referenceCode} confirmada en ese horario.`
+        );
+        error.code = 'CONFLICT';
+        throw error;
+      }
+
+      const conflictingBlock = await tx.timeBlock.findFirst({
+        where: {
+          professionalId: targetProfId,
+          startTime: { lt: windowEnd },
+          endTime: { gt: windowStart }
+        }
+      });
+
+      if (conflictingBlock) {
+        const error: any = new Error(
+          `Conflicto de horario: La esteticista tiene un bloqueo de horario (${conflictingBlock.title}) en ese intervalo.`
+        );
+        error.code = 'CONFLICT';
+        throw error;
+      }
+    }
+
+    const previousStartTime = booking.startTime;
+    const updated = await tx.booking.update({
+      where: { id: bookingId },
+      data: {
+        startTime,
+        endTime,
+        professionalId: targetProfId,
+        staffNotes: staffNotes !== undefined ? staffNotes : booking.staffNotes
+      },
+      include: {
+        professional: true,
+        locationDiscount: true
+      }
+    });
+
+    await tx.auditLog.create({
+      data: {
+        bookingId: booking.id,
+        userId: userId || null,
+        action: 'RESCHEDULED',
+        details: `Cita reprogramada de ${previousStartTime.toISOString()} a ${startTime.toISOString()}${staffNotes ? ` - Nota: ${staffNotes}` : ''}.`
+      }
+    });
+
+    await tx.notification.create({
+      data: {
+        businessId: booking.businessId,
+        professionalId: targetProfId,
+        title: 'Cita Reprogramada',
+        message: `La cita #${booking.referenceCode} (${booking.clientName}) fue cambiada para el ${startTime.toLocaleString('es-CR')}.`,
+        bookingId: booking.id
+      }
+    });
+
+    return updated;
+  });
+
+  // Notificar por Push
+  if (updated.professionalId) {
+    sendPushToProfessional(updated.professionalId, {
+      title: 'Cita Reprogramada',
+      body: `La cita #${updated.referenceCode} (${updated.clientName}) tiene nuevo horario.`,
+      url: '/admin'
+    }).catch((e) => console.warn('Error push reprogramación profesional:', e));
+  }
+
+  sendPushToOwners(updated.businessId, {
+    title: 'Cita Reprogramada',
+    body: `Cita #${updated.referenceCode} (${updated.clientName}) fue reprogramada.`,
+    url: '/admin'
+  }).catch((e) => console.warn('Error push reprogramación dueñas:', e));
 
   return updated;
 }

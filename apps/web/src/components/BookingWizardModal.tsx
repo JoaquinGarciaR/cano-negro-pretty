@@ -64,6 +64,7 @@ export function BookingWizardModal({
   const [availableSlots, setAvailableSlots] = useState<any[]>([]);
   const [selectedSlot, setSelectedSlot] = useState<any | null>(null);
   const [loadingSlots, setLoadingSlots] = useState<boolean>(false);
+  const [slotNotice, setSlotNotice] = useState<{ time: string; reason: string } | null>(null);
 
   // Datos personales y teléfono
   const [clientName, setClientName] = useState<string>('');
@@ -554,24 +555,54 @@ export function BookingWizardModal({
                     No hay franjas libres para este día o la jornada está completa.
                   </div>
                 ) : (
-                  <div className="grid grid-cols-3 sm:grid-cols-4 gap-1.5 max-h-32 overflow-y-auto pr-1">
-                    {availableSlots.map((slot) => (
-                      <button
-                        key={slot.startTime}
-                        disabled={!slot.available}
-                        type="button"
-                        onClick={() => setSelectedSlot(slot)}
-                        className={`py-1.5 px-1 text-center rounded-xl text-xs font-semibold transition-all ${
-                          !slot.available
-                            ? 'opacity-30 cursor-not-allowed bg-gray-100 text-gray-500'
-                            : selectedSlot?.startTime === slot.startTime
-                            ? 'bg-pretty-wine-900 text-white shadow-sm scale-105'
-                            : 'bg-white hover:bg-pretty-pink-50 text-pretty-wine-900 border border-pretty-pink-200/60'
-                        }`}
-                      >
-                        {slot.localStartTime}
-                      </button>
-                    ))}
+                  <div>
+                    <div className="grid grid-cols-3 sm:grid-cols-4 gap-1.5 max-h-32 overflow-y-auto pr-1">
+                      {availableSlots.map((slot) => {
+                        const isChosen = selectedSlot?.startTime === slot.startTime;
+                        const isAvailable = slot.available;
+
+                        return (
+                          <button
+                            key={slot.startTime}
+                            type="button"
+                            onClick={() => {
+                              if (!isAvailable) {
+                                setSlotNotice({
+                                  time: slot.localStartTime,
+                                  reason: slot.conflictDetail || 'Horario no disponible para ningún estilista del salón.'
+                                });
+                              } else {
+                                setSelectedSlot(slot);
+                                setSlotNotice(null);
+                              }
+                            }}
+                            className={`py-1.5 px-1 text-center rounded-xl text-xs font-semibold transition-all ${
+                              isChosen
+                                ? 'bg-pretty-wine-900 text-white shadow-sm scale-105'
+                                : isAvailable
+                                ? 'bg-white hover:bg-pretty-pink-50 text-pretty-wine-900 border border-pretty-pink-200/60'
+                                : 'opacity-40 bg-gray-100 text-gray-500 border border-gray-200 line-through cursor-pointer hover:border-rose-300 hover:bg-rose-50/50'
+                            }`}
+                            title={
+                              isAvailable
+                                ? `Turno libre: ${slot.localStartTime}`
+                                : `No disponible: ${slot.conflictDetail || 'Ocupado'}`
+                            }
+                          >
+                            {slot.localStartTime}
+                          </button>
+                        );
+                      })}
+                    </div>
+
+                    {slotNotice && (
+                      <div className="mt-2 p-2 rounded-xl bg-rose-50/90 border border-rose-200 text-[11px] text-rose-900 flex items-start space-x-1.5 animate-fadeIn">
+                        <AlertCircle className="w-3.5 h-3.5 text-rose-600 flex-shrink-0 mt-0.5" />
+                        <div>
+                          <strong>Turno de las {slotNotice.time} no disponible:</strong> {slotNotice.reason}
+                        </div>
+                      </div>
+                    )}
                   </div>
                 )}
               </div>

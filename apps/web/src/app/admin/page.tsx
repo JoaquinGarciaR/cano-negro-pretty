@@ -36,6 +36,7 @@ import {
   ChevronDown,
   Menu,
   Tag,
+  CalendarClock,
   X
 } from 'lucide-react';
 import { formatCRC } from '@cano/shared';
@@ -47,7 +48,8 @@ import {
   assignBookingApi
 } from '../../lib/api';
 import { playNotificationSound, showBrowserNotification, requestNotificationPermission, unsubscribeUserFromPush } from '../../lib/sound';
-import { WhatsAppModal } from '../../components/WhatsAppModal';
+import { WhatsAppModal, WhatsAppTemplateType } from '../../components/WhatsAppModal';
+import { RescheduleModal } from '../../components/RescheduleModal';
 import { BlockTimeModal } from '../../components/BlockTimeModal';
 import { DayAvailabilityModal } from '../../components/DayAvailabilityModal';
 import { InstallPwaModal } from '../../components/InstallPwaModal';
@@ -105,6 +107,10 @@ export default function AdminDashboardPage() {
   // Modales
   const [selectedBookingForWa, setSelectedBookingForWa] = useState<any | null>(null);
   const [isWaOpen, setIsWaOpen] = useState<boolean>(false);
+  const [waInitialTemplate, setWaInitialTemplate] = useState<WhatsAppTemplateType>('confirmation');
+  const [previousScheduleForWa, setPreviousScheduleForWa] = useState<{ date: string; time: string } | undefined>(undefined);
+  const [selectedBookingForReschedule, setSelectedBookingForReschedule] = useState<any | null>(null);
+  const [isRescheduleOpen, setIsRescheduleOpen] = useState<boolean>(false);
   const [isBlockTimeOpen, setIsBlockTimeOpen] = useState<boolean>(false);
   const [isDayAvailOpen, setIsDayAvailOpen] = useState<boolean>(false);
   const [isInstallModalOpen, setIsInstallModalOpen] = useState<boolean>(false);
@@ -703,11 +709,27 @@ export default function AdminDashboardPage() {
                           </select>
                         </div>
 
-                        {/* Botones de Confirmar / WhatsApp / Rechazar */}
-                        <div className="flex items-center space-x-1.5">
+                        {/* Botones de Cambiar Horario / WhatsApp / Rechazar / Confirmar */}
+                        <div className="flex flex-wrap items-center gap-1.5">
                           <button
+                            type="button"
+                            onClick={() => {
+                              setSelectedBookingForReschedule(b);
+                              setIsRescheduleOpen(true);
+                            }}
+                            className="inline-flex items-center space-x-1 px-2.5 py-1.5 rounded-full text-xs font-semibold bg-white hover:bg-pretty-pink-50 text-pretty-wine-900 border border-pretty-pink-200 shadow-sm transition-all"
+                            title="Cambiar fecha u hora de la cita"
+                          >
+                            <CalendarClock className="w-3.5 h-3.5 text-pretty-pink-500" />
+                            <span>Cambiar horario</span>
+                          </button>
+
+                          <button
+                            type="button"
                             onClick={() => {
                               setSelectedBookingForWa(b);
+                              setWaInitialTemplate('confirmation');
+                              setPreviousScheduleForWa(undefined);
                               setIsWaOpen(true);
                             }}
                             className="inline-flex items-center space-x-1 px-2.5 py-1.5 rounded-full text-xs font-semibold bg-white hover:bg-pretty-pink-50 text-pretty-wine-900 border border-pretty-pink-200 shadow-sm"
@@ -1035,10 +1057,26 @@ export default function AdminDashboardPage() {
                             </div>
 
                             {/* Acciones */}
-                            <div className="pt-2 flex items-center justify-end space-x-2 border-t border-pretty-pink-100">
+                            <div className="pt-2 flex flex-wrap items-center justify-end gap-1.5 border-t border-pretty-pink-100">
                               <button
+                                type="button"
+                                onClick={() => {
+                                  setSelectedBookingForReschedule(b);
+                                  setIsRescheduleOpen(true);
+                                }}
+                                className="inline-flex items-center space-x-1 px-2.5 py-1 rounded-full text-xs font-semibold bg-white hover:bg-pretty-pink-50 text-pretty-wine-900 border border-pretty-pink-200 transition-all"
+                                title="Cambiar fecha u hora de la cita"
+                              >
+                                <CalendarClock className="w-3 h-3 text-pretty-pink-500" />
+                                <span>Cambiar horario</span>
+                              </button>
+
+                              <button
+                                type="button"
                                 onClick={() => {
                                   setSelectedBookingForWa(b);
+                                  setWaInitialTemplate('confirmation');
+                                  setPreviousScheduleForWa(undefined);
                                   setIsWaOpen(true);
                                 }}
                                 className="inline-flex items-center space-x-1 px-2.5 py-1 rounded-full text-xs font-semibold bg-white hover:bg-pretty-pink-50 text-pretty-wine-900 border border-pretty-pink-200"
@@ -1254,10 +1292,26 @@ export default function AdminDashboardPage() {
                         </div>
 
                         {/* Acciones */}
-                        <div className="pt-2 flex items-center justify-end space-x-1.5 border-t border-pretty-pink-100">
+                        <div className="pt-2 flex flex-wrap items-center justify-end gap-1.5 border-t border-pretty-pink-100">
                           <button
+                            type="button"
+                            onClick={() => {
+                              setSelectedBookingForReschedule(b);
+                              setIsRescheduleOpen(true);
+                            }}
+                            className="inline-flex items-center space-x-1 px-2.5 py-1 rounded-full text-xs font-semibold bg-white hover:bg-pretty-pink-50 text-pretty-wine-900 border border-pretty-pink-200 transition-all"
+                            title="Cambiar fecha u hora de la cita"
+                          >
+                            <CalendarClock className="w-3 h-3 text-pretty-pink-500" />
+                            <span>Cambiar horario</span>
+                          </button>
+
+                          <button
+                            type="button"
                             onClick={() => {
                               setSelectedBookingForWa(b);
+                              setWaInitialTemplate('confirmation');
+                              setPreviousScheduleForWa(undefined);
                               setIsWaOpen(true);
                             }}
                             className="inline-flex items-center space-x-1 px-2.5 py-1 rounded-full text-xs font-semibold bg-white hover:bg-pretty-pink-50 text-pretty-wine-900 border border-pretty-pink-200"
@@ -1432,6 +1486,26 @@ export default function AdminDashboardPage() {
         isOpen={isWaOpen}
         onClose={() => setIsWaOpen(false)}
         booking={selectedBookingForWa}
+        initialTemplate={waInitialTemplate}
+        previousSchedule={previousScheduleForWa}
+      />
+
+      {/* Modal de Cambio de Horario / Reprogramación */}
+      <RescheduleModal
+        isOpen={isRescheduleOpen}
+        onClose={() => setIsRescheduleOpen(false)}
+        booking={selectedBookingForReschedule}
+        professionals={catalog?.professionals || []}
+        token={authToken}
+        onSuccess={(updatedBooking, previousSchedule) => {
+          loadData();
+          setActionSuccess(`Cita #${updatedBooking.referenceCode} reprogramada con éxito.`);
+          // Abrir modal de WhatsApp con la plantilla de cambio de horario lista para enviar
+          setSelectedBookingForWa(updatedBooking);
+          setWaInitialTemplate('reschedule');
+          setPreviousScheduleForWa(previousSchedule);
+          setIsWaOpen(true);
+        }}
       />
 
       {/* Modal de Bloqueo de Tiempo */}

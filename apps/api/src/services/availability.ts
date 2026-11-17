@@ -84,22 +84,43 @@ export async function calculateAvailability(params: GetAvailabilityParams): Prom
       )
     );
 
-    if (allSlotLists.length === 0 || allSlotLists[0].length === 0) {
+    // Filtrar listas con slots de profesionales que abrieron jornada este día
+    const activeSlotLists = allSlotLists.filter(list => list.length > 0);
+    if (activeSlotLists.length === 0) {
       return [];
     }
 
-    // Fusionar: si al menos una esteticista está libre en ese slot, queda disponible
-    const baseSlots = allSlotLists[0];
-    const merged: AvailableTimeSlot[] = baseSlots.map((base, idx) => {
-      const anyFreeSlot = allSlotLists.map(list => list[idx]).find(s => s && s.available);
-      return {
-        ...base,
-        available: Boolean(anyFreeSlot),
-        conflictDetail: anyFreeSlot ? undefined : base.conflictDetail,
-        consecutiveBlocks: base.consecutiveBlocks,
-        requiredBlocks: base.requiredBlocks
-      };
-    });
+    // Unificar todos los slots por localStartTime
+    const slotsMap = new Map<string, AvailableTimeSlot>();
+
+    for (const slotList of activeSlotLists) {
+      for (const slot of slotList) {
+        const existing = slotsMap.get(slot.localStartTime);
+        if (!existing) {
+          slotsMap.set(slot.localStartTime, { ...slot });
+        } else {
+          // Si al menos una profesional está disponible en este horario, el horario del salón queda disponible
+          if (slot.available) {
+            existing.available = true;
+            existing.conflictDetail = undefined;
+          } else if (!existing.available && !existing.conflictDetail) {
+            existing.conflictDetail = slot.conflictDetail;
+          }
+        }
+      }
+    }
+
+    // Si algún slot quedó no disponible, clarificar el detalle para la usuaria
+    for (const slot of slotsMap.values()) {
+      if (!slot.available && !slot.conflictDetail) {
+        slot.conflictDetail = 'Horario no disponible para ninguna esteticista del salón.';
+      }
+    }
+
+    // Ordenar cronológicamente
+    const merged = Array.from(slotsMap.values()).sort((a, b) =>
+      a.localStartTime.localeCompare(b.localStartTime)
+    );
 
     return merged;
   }

@@ -121,6 +121,14 @@ export const AssignBookingSchema = z.object({
 
 export type AssignBookingInput = z.infer<typeof AssignBookingSchema>;
 
+export const RescheduleBookingSchema = z.object({
+  startTime: z.string().datetime({ message: 'La nueva fecha y hora deben ser una fecha válida ISO' }),
+  professionalId: z.string().optional(),
+  staffNotes: z.string().max(500, 'Las notas de personal no pueden exceder 500 caracteres').optional()
+});
+
+export type RescheduleBookingInput = z.infer<typeof RescheduleBookingSchema>;
+
 export const UpdateBookingStatusSchema = z.object({
   status: z.enum(['PENDING', 'CONFIRMED', 'REJECTED', 'CANCELLED', 'COMPLETED']),
   staffNotes: z.string().max(500).optional(),

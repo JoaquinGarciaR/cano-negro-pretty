@@ -167,6 +167,28 @@ export async function assignBookingApi(bookingId: string, professionalId: string
   return data;
 }
 
+export async function rescheduleBookingApi(
+  bookingId: string,
+  payload: { startTime: string; professionalId?: string; staffNotes?: string },
+  token?: string
+) {
+  const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+  if (token) headers['Authorization'] = `Bearer ${token}`;
+
+  const res = await fetch(`${API_URL}/admin/bookings/${bookingId}/reschedule`, {
+    method: 'PATCH',
+    headers,
+    credentials: 'include',
+    body: JSON.stringify(payload)
+  });
+
+  const data = await res.json();
+  if (!res.ok) {
+    throw new Error(data.error || 'Error al reprogramar cita');
+  }
+  return data;
+}
+
 export async function createTimeBlockApi(payload: any, token?: string) {
   const headers: Record<string, string> = { 'Content-Type': 'application/json' };
   if (token) headers['Authorization'] = `Bearer ${token}`;
