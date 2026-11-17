@@ -23,13 +23,15 @@ export async function fetchAvailability(params: {
   packageId?: string;
   modality: 'AT_STATION' | 'HOME_VISIT';
   date: string;
+  excludeBookingId?: string;
 }) {
   const query = new URLSearchParams({
     modality: params.modality,
     date: params.date,
     ...(params.professionalId ? { professionalId: params.professionalId } : {}),
     ...(params.serviceId ? { serviceId: params.serviceId } : {}),
-    ...(params.packageId ? { packageId: params.packageId } : {})
+    ...(params.packageId ? { packageId: params.packageId } : {}),
+    ...(params.excludeBookingId ? { excludeBookingId: params.excludeBookingId } : {})
   });
 
   const res = await fetch(`${API_URL}/availability?${query.toString()}`, { cache: 'no-store' });

@@ -10,6 +10,7 @@ interface GetAvailabilityParams {
   packageId?: string;
   modality: Modality;
   dateStr: string; // "YYYY-MM-DD"
+  excludeBookingId?: string;
 }
 
 /**
@@ -79,7 +80,8 @@ export async function calculateAvailability(params: GetAvailabilityParams): Prom
           serviceId,
           packageId,
           modality,
-          dateStr
+          dateStr,
+          excludeBookingId: params.excludeBookingId
         })
       )
     );
@@ -131,7 +133,8 @@ export async function calculateAvailability(params: GetAvailabilityParams): Prom
     serviceId,
     packageId,
     modality,
-    dateStr
+    dateStr,
+    excludeBookingId: params.excludeBookingId
   });
 }
 
@@ -141,8 +144,9 @@ async function calculateSingleProfAvailability(params: {
   packageId?: string;
   modality: Modality;
   dateStr: string;
+  excludeBookingId?: string;
 }): Promise<AvailableTimeSlot[]> {
-  const { professionalId, serviceId, packageId, modality, dateStr } = params;
+  const { professionalId, serviceId, packageId, modality, dateStr, excludeBookingId } = params;
 
   // 1. Verificar si el día está explícitamente DESBLOQUEADO / ABIERTO por la profesional
   const dayAvail = await prisma.dayAvailability.findUnique({
@@ -190,13 +194,19 @@ async function calculateSingleProfAvailability(params: {
   const scheduleStartMinutes = startHour * 60 + startMin;
   const scheduleEndMinutes = endHour * 60 + endMin;
 
+  const whereBookings: any = {
+    professionalId,
+    status: BookingStatus.CONFIRMED,
+    startTime: { lte: dayEndUTC },
+    endTime: { gte: dayStartUTC }
+  };
+
+  if (excludeBookingId) {
+    whereBookings.id = { not: excludeBookingId };
+  }
+
   const existingBookings = await prisma.booking.findMany({
-    where: {
-      professionalId,
-      status: BookingStatus.CONFIRMED,
-      startTime: { lte: dayEndUTC },
-      endTime: { gte: dayStartUTC }
-    }
+    where: whereBookings
   });
 
   const existingBlocks = await prisma.timeBlock.findMany({

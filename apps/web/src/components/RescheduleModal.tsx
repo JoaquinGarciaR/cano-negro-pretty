@@ -145,7 +145,8 @@ export function RescheduleModal({
           serviceId: booking.serviceId || undefined,
           packageId: booking.packageId || undefined,
           modality: booking.modality || 'AT_STATION',
-          date: selectedDate
+          date: selectedDate,
+          excludeBookingId: booking.id
         });
 
         if (isMounted) {

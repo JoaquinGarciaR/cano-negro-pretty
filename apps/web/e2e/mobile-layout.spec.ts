@@ -54,15 +54,19 @@ test.describe('Caño Negro Pretty - Mobile Layout & Responsiveness (iPhone 14 Vi
     await nextBtn.click({ force: true });
     await expect(page.locator('h3:has-text("Fecha y Hora Disponible")')).toBeVisible();
 
-    // Seleccionar el primer día desbloqueado si existe
-    const unlockedDay = page.locator('.fixed button:not([disabled])').filter({ hasText: /^\d+$/ }).first();
-    if (await unlockedDay.isVisible().catch(() => false)) {
-      await unlockedDay.click({ force: true }).catch(() => {});
+    // Seleccionar un día desbloqueado a futuro si existe para tener turnos libres garantizados
+    const unlockedDays = page.locator('.fixed button:not([disabled])').filter({ hasText: /^\d+$/ });
+    const countDays = await unlockedDays.count();
+    if (countDays > 1) {
+      // Elegir un día posterior para evitar horarios pasados de hoy
+      await unlockedDays.nth(1).click({ force: true }).catch(() => {});
+    } else if (countDays === 1) {
+      await unlockedDays.first().click({ force: true }).catch(() => {});
     }
 
-    // Si hay una franja horaria disponible, seleccionarla para avanzar
-    const slotBtn = page.locator('.fixed button:not([disabled])').filter({ hasText: /^\d{2}:\d{2}/ }).first();
-    const hasSlot = await slotBtn.isVisible().catch(() => false);
+    // Esperar a que se carguen los turnos y seleccionar uno libre
+    const slotBtn = page.locator('.fixed button[title^="Turno libre:"]').first();
+    const hasSlot = await slotBtn.waitFor({ state: 'visible', timeout: 3000 }).then(() => true).catch(() => false);
     
     if (hasSlot) {
       await slotBtn.click({ force: true });

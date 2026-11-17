@@ -21,7 +21,7 @@ availabilityRouter.get('/open-days', async (req, res) => {
 // Consultar franjas horarias de un día específico desbloqueado
 availabilityRouter.get('/', async (req, res) => {
   try {
-    const { professionalId, serviceId, packageId, modality, date } = req.query;
+    const { professionalId, serviceId, packageId, modality, date, excludeBookingId } = req.query;
 
     if (!date || typeof date !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(date)) {
       return res.status(400).json({ error: 'La fecha debe estar en formato YYYY-MM-DD' });
@@ -35,7 +35,8 @@ availabilityRouter.get('/', async (req, res) => {
       serviceId: typeof serviceId === 'string' ? serviceId : undefined,
       packageId: typeof packageId === 'string' ? packageId : undefined,
       modality: resolvedModality,
-      dateStr: date
+      dateStr: date,
+      excludeBookingId: typeof excludeBookingId === 'string' ? excludeBookingId : undefined
     });
 
     res.json({ date, professionalId: profIdStr || 'all', slots });
