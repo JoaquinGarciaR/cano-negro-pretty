@@ -1841,7 +1841,15 @@ export default function AdminDashboardPage() {
         initialDate={selectedDateForAvail}
         initialMode={availabilityModalMode}
         token={authToken}
-        onSuccess={loadData}
+        onSuccess={(targetDate) => {
+          loadData();
+          if (targetDate) {
+            const parts = targetDate.split('-').map(Number);
+            if (parts.length === 3) {
+              setAvailabilityMonth(new Date(parts[0], parts[1] - 1, 1));
+            }
+          }
+        }}
       />
 
       {/* Modal de Instrucciones de Instalación PWA */}
