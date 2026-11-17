@@ -567,6 +567,7 @@ export function BookingWizardModal({
                 <label className="block text-xs font-semibold text-pretty-wine-900 mb-1 flex items-center space-x-1.5">
                   <User className="w-3.5 h-3.5 text-pretty-pink-500" />
                   <span>Tu nombre completo:</span>
+                  <span className="text-rose-600 font-bold" title="Campo obligatorio">* (Obligatorio)</span>
                 </label>
                 <input
                   type="text"
@@ -581,6 +582,7 @@ export function BookingWizardModal({
                 <label className="block text-xs font-semibold text-pretty-wine-900 mb-1 flex items-center space-x-1.5">
                   <Phone className="w-3.5 h-3.5 text-pretty-pink-500" />
                   <span>Teléfono celular (WhatsApp):</span>
+                  <span className="text-rose-600 font-bold" title="Campo obligatorio">* (Obligatorio)</span>
                 </label>
                 
                 <div className="flex space-x-2">

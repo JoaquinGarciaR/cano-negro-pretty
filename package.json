@@ -7,6 +7,8 @@
     "dev:api": "pnpm --filter @cano/api dev",
     "dev:web": "pnpm --filter @cano/web dev",
     "build:shared": "pnpm --filter @cano/shared build",
+    "build:web": "pnpm --filter @cano/shared build && pnpm --filter @cano/web build",
+    "build:api": "pnpm --filter @cano/shared build && pnpm --filter @cano/api build",
     "build": "pnpm -r build",
     "db:migrate": "pnpm --filter @cano/api prisma migrate dev",
     "db:push": "pnpm --filter @cano/api prisma db push",

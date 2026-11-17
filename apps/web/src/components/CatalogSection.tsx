@@ -112,16 +112,19 @@ export function CatalogSection({
               {packages.map((pkg) => (
                 <div
                   key={pkg.id}
-                  className="glass-panel glass-card-interactive rounded-3xl p-6 flex flex-col justify-between border-pretty-pink-300/40 relative overflow-hidden"
+                  className="glass-panel glass-card-interactive rounded-3xl p-5 sm:p-6 flex flex-col justify-between border-pretty-pink-300/40 relative overflow-hidden"
                 >
-                  <div className="absolute top-4 right-4 bg-gradient-to-r from-pretty-wine-900 to-pretty-pink-600 text-white text-[11px] font-bold px-3 py-1 rounded-full shadow-sm">
-                    Combo Especial
-                  </div>
-
                   <div>
-                    <h4 className="font-serif text-xl font-bold text-pretty-wine-900 mb-2">
-                      {pkg.name}
-                    </h4>
+                    <div className="flex items-start justify-between gap-3 mb-2.5">
+                      <h4 className="font-serif text-lg sm:text-xl font-bold text-pretty-wine-900 leading-snug">
+                        {pkg.name}
+                      </h4>
+                      <span className="flex-shrink-0 inline-flex items-center space-x-1 bg-gradient-to-r from-pretty-wine-900 to-pretty-pink-600 text-white text-[10px] sm:text-[11px] font-bold px-2.5 sm:px-3 py-1 rounded-full shadow-xs whitespace-nowrap">
+                        <Sparkles className="w-3 h-3 text-pretty-pink-300 flex-shrink-0" />
+                        <span>Combo Especial</span>
+                      </span>
+                    </div>
+
                     <p className="text-xs sm:text-sm text-pretty-wine-800/80 leading-relaxed mb-4">
                       {pkg.description}
                     </p>

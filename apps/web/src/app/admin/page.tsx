@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import {
@@ -56,6 +56,8 @@ import { AdminProfileModal } from '../../components/AdminProfileModal';
 import { AdminServicesModal } from '../../components/AdminServicesModal';
 import { AdminLocationsModal } from '../../components/AdminLocationsModal';
 import { PushNotificationModal } from '../../components/PushNotificationModal';
+import { AdminMenuDrawer } from '../../components/AdminMenuDrawer';
+import { StylistDropdown } from '../../components/StylistDropdown';
 
 export default function AdminDashboardPage() {
   const router = useRouter();
@@ -355,7 +357,8 @@ export default function AdminDashboardPage() {
         const matchesPhone = b.clientPhone?.includes(q);
         const matchesService = b.serviceName?.toLowerCase().includes(q);
         const matchesRef = b.referenceCode?.toLowerCase().includes(q);
-        if (!matchesName && !matchesPhone && !matchesService && !matchesRef) return false;
+        const matchesProf = b.professional?.name?.toLowerCase().includes(q);
+        if (!matchesName && !matchesPhone && !matchesService && !matchesRef && !matchesProf) return false;
       }
 
       return true;
@@ -415,332 +418,6 @@ export default function AdminDashboardPage() {
             </button>
           </div>
         </div>
-
-        {/* Drawer Menú Administrativo Slide-over Completo */}
-        {isMenuOpen && (
-          <div className="fixed inset-0 z-50 flex justify-end bg-pretty-wine-950/40 backdrop-blur-sm animate-fade-in">
-            <div className="relative w-full max-w-xs sm:max-w-sm h-full glass-panel shadow-2xl border-l border-white/80 p-5 flex flex-col justify-between overflow-y-auto">
-              <div>
-                {/* Header del menú con avatar y botón cerrar */}
-                <div className="flex items-center justify-between pb-4 border-b border-pretty-pink-200/50">
-                  <div className="flex items-center space-x-2.5">
-                    <div className="w-10 h-10 rounded-2xl bg-gradient-to-tr from-pretty-wine-900 to-pretty-pink-500 text-white flex items-center justify-center font-serif text-sm font-bold shadow-md">
-                      {currentUser?.name?.slice(0, 2).toUpperCase() || 'CN'}
-                    </div>
-                    <div className="min-w-0">
-                      <p className="font-serif font-bold text-sm text-pretty-wine-900 truncate">
-                        {currentUser?.name || 'Personal'}
-                      </p>
-                      <p className="text-[11px] text-pretty-wine-700/70 truncate">
-                        {currentUser?.email}
-                      </p>
-                    </div>
-                  </div>
-
-                  <button
-                    onClick={() => setIsMenuOpen(false)}
-                    className="p-1.5 rounded-full bg-white/70 hover:bg-white text-pretty-wine-800 transition-colors shadow-sm"
-                  >
-                    <X className="w-4 h-4" />
-                  </button>
-                </div>
-
-                <div className="py-3 space-y-4">
-                  {/* SECCIÓN 1: ACCIONES RÁPIDAS */}
-                  <div>
-                    <p className="text-[10px] font-bold uppercase tracking-wider text-pretty-wine-700/60 px-2 mb-1.5">
-                      Acciones Rápidas
-                    </p>
-                    <div className="space-y-1">
-                      {/* 1.1 Nueva Cita Manual */}
-                      <button
-                        onClick={() => {
-                          setIsMenuOpen(false);
-                          setIsManualBookingOpen(true);
-                        }}
-                        className="w-full p-2.5 rounded-2xl text-left text-xs font-semibold text-pretty-wine-900 hover:bg-white/90 transition-all flex items-center space-x-3 shadow-xs bg-pretty-pink-50/80 border border-pretty-pink-200/50"
-                      >
-                        <div className="p-2 rounded-xl bg-pretty-wine-900 text-white shadow-xs">
-                          <PlusCircle className="w-4 h-4" />
-                        </div>
-                        <div>
-                          <span className="block font-bold">Nueva Cita Manual</span>
-                          <span className="text-[10px] text-pretty-wine-700/60 font-normal">Registrar cita en recepción o teléfono</span>
-                        </div>
-                      </button>
-
-                      {/* 1.2 Bloquear Horario */}
-                      <button
-                        onClick={() => {
-                          setIsMenuOpen(false);
-                          setIsBlockTimeOpen(true);
-                        }}
-                        className="w-full p-2.5 rounded-2xl text-left text-xs font-semibold text-pretty-wine-900 hover:bg-white/90 transition-all flex items-center space-x-3 shadow-xs"
-                      >
-                        <div className="p-2 rounded-xl bg-pretty-pink-100 text-pretty-pink-700">
-                          <Lock className="w-4 h-4" />
-                        </div>
-                        <div>
-                          <span className="block">Bloquear Horario</span>
-                          <span className="text-[10px] text-pretty-wine-700/60 font-normal">Almuerzos, descansos o imprevistos</span>
-                        </div>
-                      </button>
-
-                      {/* 1.3 Apertura de Jornadas */}
-                      <button
-                        onClick={() => {
-                          setIsMenuOpen(false);
-                          setSelectedDateForAvail(undefined);
-                          setIsDayAvailOpen(true);
-                        }}
-                        className="w-full p-2.5 rounded-2xl text-left text-xs font-semibold text-pretty-wine-900 hover:bg-white/90 transition-all flex items-center space-x-3 shadow-xs"
-                      >
-                        <div className="p-2 rounded-xl bg-pretty-pink-100 text-pretty-pink-700">
-                          <Unlock className="w-4 h-4" />
-                        </div>
-                        <div>
-                          <span className="block">Abrir / Configurar Día</span>
-                          <span className="text-[10px] text-pretty-wine-700/60 font-normal">Habilitar jornadas y horas laborales</span>
-                        </div>
-                      </button>
-                    </div>
-                  </div>
-
-                  {/* SECCIÓN 2: VISTAS DEL SALÓN */}
-                  <div>
-                    <p className="text-[10px] font-bold uppercase tracking-wider text-pretty-wine-700/60 px-2 mb-1.5">
-                      Vistas del Salón
-                    </p>
-                    <div className="space-y-1">
-                      {/* 2.1 Solicitudes */}
-                      <button
-                        onClick={() => {
-                          setIsMenuOpen(false);
-                          setActiveTab('pending');
-                          setFilterStatus('PENDING');
-                        }}
-                        className={`w-full p-2.5 rounded-2xl text-left text-xs font-semibold transition-all flex items-center justify-between shadow-xs ${
-                          activeTab === 'pending' ? 'bg-pretty-pink-100/90 text-pretty-wine-900 font-bold' : 'text-pretty-wine-900 hover:bg-white/90'
-                        }`}
-                      >
-                        <div className="flex items-center space-x-3">
-                          <div className="p-2 rounded-xl bg-pretty-pink-100 text-pretty-pink-700">
-                            <Clock className="w-4 h-4" />
-                          </div>
-                          <div>
-                            <span className="block">Bandeja de Solicitudes</span>
-                            <span className="text-[10px] text-pretty-wine-700/60 font-normal">Revisar citas entrantes</span>
-                          </div>
-                        </div>
-                        {pendingBookings.length > 0 && (
-                          <span className="bg-pretty-wine-900 text-white text-[10px] px-2 py-0.5 rounded-full font-bold">
-                            {pendingBookings.length}
-                          </span>
-                        )}
-                      </button>
-
-                      {/* 2.2 Agenda del Salón */}
-                      <button
-                        onClick={() => {
-                          setIsMenuOpen(false);
-                          setActiveTab('agenda');
-                          setFilterStatus('ALL');
-                        }}
-                        className={`w-full p-2.5 rounded-2xl text-left text-xs font-semibold transition-all flex items-center space-x-3 shadow-xs ${
-                          activeTab === 'agenda' ? 'bg-pretty-pink-100/90 text-pretty-wine-900 font-bold' : 'text-pretty-wine-900 hover:bg-white/90'
-                        }`}
-                      >
-                        <div className="p-2 rounded-xl bg-pretty-pink-100 text-pretty-pink-700">
-                          <Calendar className="w-4 h-4" />
-                        </div>
-                        <div>
-                          <span className="block">Agenda & Calendario</span>
-                          <span className="text-[10px] text-pretty-wine-700/60 font-normal">Citas por día, mes o rango</span>
-                        </div>
-                      </button>
-
-                      {/* 2.3 Apertura de Agenda */}
-                      <button
-                        onClick={() => {
-                          setIsMenuOpen(false);
-                          setActiveTab('availability');
-                        }}
-                        className={`w-full p-2.5 rounded-2xl text-left text-xs font-semibold transition-all flex items-center space-x-3 shadow-xs ${
-                          activeTab === 'availability' ? 'bg-pretty-pink-100/90 text-pretty-wine-900 font-bold' : 'text-pretty-wine-900 hover:bg-white/90'
-                        }`}
-                      >
-                        <div className="p-2 rounded-xl bg-pretty-pink-100 text-pretty-pink-700">
-                          <CalendarRange className="w-4 h-4" />
-                        </div>
-                        <div>
-                          <span className="block">Apertura de Agenda</span>
-                          <span className="text-[10px] text-pretty-wine-700/60 font-normal">Días abiertos para reservas online</span>
-                        </div>
-                      </button>
-                    </div>
-                  </div>
-
-                  {/* SECCIÓN 3: CONFIGURACIÓN & CATÁLOGO */}
-                  <div>
-                    <p className="text-[10px] font-bold uppercase tracking-wider text-pretty-wine-700/60 px-2 mb-1.5">
-                      Configuración & Negocio
-                    </p>
-                    <div className="space-y-1">
-                      {/* 3.1 Gestión de Servicios */}
-                      <button
-                        onClick={() => {
-                          setIsMenuOpen(false);
-                          setIsServicesOpen(true);
-                        }}
-                        className="w-full p-2.5 rounded-2xl text-left text-xs font-semibold text-pretty-wine-900 hover:bg-white/90 transition-all flex items-center space-x-3 shadow-xs"
-                      >
-                        <div className="p-2 rounded-xl bg-pretty-pink-100 text-pretty-pink-700">
-                          <Tag className="w-4 h-4" />
-                        </div>
-                        <div>
-                          <span className="block">Gestión de Servicios</span>
-                          <span className="text-[10px] text-pretty-wine-700/60 font-normal">Precios, duraciones y catálogo</span>
-                        </div>
-                      </button>
-
-                      {/* 3.2 Tarifas & Ubicaciones Domicilio */}
-                      <button
-                        onClick={() => {
-                          setIsMenuOpen(false);
-                          setIsLocationsOpen(true);
-                        }}
-                        className="w-full p-2.5 rounded-2xl text-left text-xs font-semibold text-pretty-wine-900 hover:bg-white/90 transition-all flex items-center space-x-3 shadow-xs"
-                      >
-                        <div className="p-2 rounded-xl bg-pretty-pink-100 text-pretty-pink-700">
-                          <MapPin className="w-4 h-4" />
-                        </div>
-                        <div>
-                          <span className="block">Tarifas & Ubicaciones Domicilio</span>
-                          <span className="text-[10px] text-pretty-wine-700/60 font-normal">Costo de traslado por comunidad</span>
-                        </div>
-                      </button>
-
-                      {/* 3.3 Mi Cuenta & Perfil */}
-                      <button
-                        onClick={() => {
-                          setIsMenuOpen(false);
-                          setIsProfileOpen(true);
-                        }}
-                        className="w-full p-2.5 rounded-2xl text-left text-xs font-semibold text-pretty-wine-900 hover:bg-white/90 transition-all flex items-center space-x-3 shadow-xs"
-                      >
-                        <div className="p-2 rounded-xl bg-pretty-pink-100 text-pretty-pink-700">
-                          <User className="w-4 h-4" />
-                        </div>
-                        <div>
-                          <span className="block">Mi Cuenta & Perfil</span>
-                          <span className="text-[10px] text-pretty-wine-700/60 font-normal">Datos personales, biografía y clave</span>
-                        </div>
-                      </button>
-                    </div>
-                  </div>
-
-                  {/* SECCIÓN 4: HERRAMIENTAS & ACCESOS */}
-                  <div>
-                    <p className="text-[10px] font-bold uppercase tracking-wider text-pretty-wine-700/60 px-2 mb-1.5">
-                      Herramientas & Notificaciones
-                    </p>
-                    <div className="space-y-1">
-                      {/* 4.1 Alertas & Sonido */}
-                      <button
-                        onClick={() => {
-                          setIsMenuOpen(false);
-                          setIsPushModalOpen(true);
-                        }}
-                        className="w-full p-2.5 rounded-2xl text-left text-xs font-semibold text-pretty-wine-900 hover:bg-white/90 transition-all flex items-center justify-between shadow-xs"
-                      >
-                        <div className="flex items-center space-x-3">
-                          <div className="p-2 rounded-xl bg-pretty-pink-100 text-pretty-pink-700">
-                            <Bell className="w-4 h-4" />
-                          </div>
-                          <div>
-                            <span className="block">Alertas & Sonido</span>
-                            <span className="text-[10px] text-pretty-wine-700/60 font-normal">Tono cristalino y push</span>
-                          </div>
-                        </div>
-                        <span className={`text-[10px] px-2 py-0.5 rounded-full font-bold ${
-                          notifGranted ? 'bg-emerald-100 text-emerald-800' : 'bg-pretty-pink-200 text-pretty-wine-800'
-                        }`}>
-                          {notifGranted ? 'Activo' : 'Probar'}
-                        </span>
-                      </button>
-
-                      {/* 4.2 Compartir Enlace Catálogo */}
-                      <button
-                        onClick={() => {
-                          const url = typeof window !== 'undefined' ? `${window.location.origin}/#catalogo` : 'https://canonegropretty.com/#catalogo';
-                          navigator.clipboard.writeText(url);
-                          setActionSuccess('¡Enlace del catálogo (#catalogo) copiado!');
-                          setIsMenuOpen(false);
-                        }}
-                        className="w-full p-2.5 rounded-2xl text-left text-xs font-semibold text-pretty-wine-900 hover:bg-white/90 transition-all flex items-center space-x-3 shadow-xs"
-                      >
-                        <div className="p-2 rounded-xl bg-pretty-pink-100 text-pretty-pink-700">
-                          <Share2 className="w-4 h-4" />
-                        </div>
-                        <div>
-                          <span className="block">Compartir Catálogo</span>
-                          <span className="text-[10px] text-pretty-wine-700/60 font-normal">Copiar enlace directo para clientas</span>
-                        </div>
-                      </button>
-
-                      {/* 4.3 Instalar en Teléfono */}
-                      <button
-                        onClick={() => {
-                          setIsMenuOpen(false);
-                          handleInstallPwa();
-                        }}
-                        className="w-full p-2.5 rounded-2xl text-left text-xs font-semibold text-pretty-wine-900 hover:bg-white/90 transition-all flex items-center space-x-3 shadow-xs"
-                      >
-                        <div className="p-2 rounded-xl bg-pretty-pink-100 text-pretty-pink-700">
-                          <Download className="w-4 h-4" />
-                        </div>
-                        <div>
-                          <span className="block">Instalar en Teléfono</span>
-                          <span className="text-[10px] text-pretty-wine-700/60 font-normal">Instrucciones iPhone / Android</span>
-                        </div>
-                      </button>
-
-                      {/* 4.4 Ver Web Pública */}
-                      <Link
-                        href="/#catalogo"
-                        target="_blank"
-                        onClick={() => setIsMenuOpen(false)}
-                        className="w-full p-2.5 rounded-2xl text-left text-xs font-semibold text-pretty-wine-900 hover:bg-white/90 transition-all flex items-center space-x-3 shadow-xs"
-                      >
-                        <div className="p-2 rounded-xl bg-pretty-pink-100 text-pretty-pink-700">
-                          <Sparkles className="w-4 h-4" />
-                        </div>
-                        <div>
-                          <span className="block">Ver Catálogo Público Web</span>
-                          <span className="text-[10px] text-pretty-wine-700/60 font-normal">Abrir vista de clienta en nueva pestaña</span>
-                        </div>
-                      </Link>
-                    </div>
-                  </div>
-                </div>
-              </div>
-
-              {/* Footer del menú: Cerrar Sesión */}
-              <div className="pt-4 border-t border-pretty-pink-200/50">
-                <button
-                  onClick={() => {
-                    setIsMenuOpen(false);
-                    handleLogout();
-                  }}
-                  className="w-full py-2.5 px-3 rounded-2xl bg-pretty-wine-900/10 hover:bg-pretty-wine-900 hover:text-white text-pretty-wine-900 text-xs font-bold transition-all flex items-center justify-center space-x-2"
-                >
-                  <LogOut className="w-4 h-4" />
-                  <span>Cerrar Sesión</span>
-                </button>
-              </div>
-            </div>
-          </div>
-        )}
 
         {/* Pestañas de navegación de bandeja */}
         <div className="max-w-5xl mx-auto px-3 sm:px-4 flex border-t border-pretty-pink-200/40">
@@ -836,6 +513,34 @@ export default function AdminDashboardPage() {
                 <span>Ingresar Cita Manual</span>
               </button>
             </div>
+
+            {/* Filtro Dropdown por Estilista para la Propietaria */}
+            {currentUser?.role === 'OWNER' && (
+              <div className="flex items-center justify-between gap-2 p-2 rounded-2xl bg-white/70 border border-white/90">
+                <div className="flex items-center space-x-2">
+                  <span className="text-[11px] font-bold text-pretty-wine-700/80 flex items-center space-x-1 pl-1">
+                    <User className="w-3.5 h-3.5 text-pretty-pink-500" />
+                    <span>Filtrar bandeja:</span>
+                  </span>
+
+                  <StylistDropdown
+                    value={filterProfessionalId}
+                    onChange={setFilterProfessionalId}
+                    professionals={catalog?.professionals || []}
+                    allLabel="Todas las solicitudes"
+                    allSublabel="Bandeja general completa"
+                    unassignedLabel="Sin asignar"
+                    unassignedSublabel="Pendientes de asignación"
+                    headerTitle="Filtrar Solicitudes"
+                    title="Filtrar solicitudes por estilista"
+                  />
+                </div>
+
+                <div className="text-[11px] text-pretty-wine-700/70 font-semibold px-2">
+                  {pendingBookings.length} {pendingBookings.length === 1 ? 'pendiente' : 'pendientes'}
+                </div>
+              </div>
+            )}
 
             {loading ? (
               <div className="py-12 text-center text-xs text-pretty-wine-800/80">
@@ -1030,16 +735,41 @@ export default function AdminDashboardPage() {
             {/* Barra de Controles y Selector de Modo de Vista */}
             <div className="glass-panel rounded-2xl p-3 sm:p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
               <div>
-                <h3 className="font-serif text-base sm:text-lg font-bold text-pretty-wine-900">
-                  Agenda del Salón
-                </h3>
+                <div className="flex items-center space-x-2">
+                  <h3 className="font-serif text-base sm:text-lg font-bold text-pretty-wine-900">
+                    Agenda del Salón
+                  </h3>
+                  {currentUser?.role === 'OWNER' && (
+                    <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-pretty-pink-200/80 text-pretty-wine-900">
+                      Propietaria (Todas las citas)
+                    </span>
+                  )}
+                </div>
                 <p className="text-xs text-pretty-wine-800/80">
-                  Explora las citas en el calendario visual interactivo o en el listado por rango de fechas.
+                  {currentUser?.role === 'OWNER'
+                    ? 'Monitorea todas las citas del salón o filtra por estilista específica.'
+                    : 'Explora las citas en el calendario visual interactivo o en el listado por rango de fechas.'}
                 </p>
               </div>
 
-              {/* Toggle de Subvista */}
-              <div className="flex items-center space-x-1 p-1 rounded-2xl bg-pretty-pink-100/70 border border-pretty-pink-200/60 self-start sm:self-auto">
+              <div className="flex flex-wrap items-center gap-2 self-start sm:self-auto">
+                {/* Selector Elegante de Estilista para la Propietaria (Custom Pretty Dropdown) */}
+                {currentUser?.role === 'OWNER' && (
+                  <StylistDropdown
+                    value={filterProfessionalId}
+                    onChange={setFilterProfessionalId}
+                    professionals={catalog?.professionals || []}
+                    allLabel="Todas las Estilistas"
+                    allSublabel="Agenda completa del salón"
+                    unassignedLabel="Sin asignar"
+                    unassignedSublabel="Citas pendientes de asignación"
+                    headerTitle="Filtrar Citas del Salón"
+                    title="Filtrar agenda por estilista"
+                  />
+                )}
+
+                {/* Toggle de Subvista */}
+                <div className="flex items-center space-x-1 p-1 rounded-2xl bg-pretty-pink-100/70 border border-pretty-pink-200/60">
                 <button
                   type="button"
                   onClick={() => setAgendaViewMode('calendar')}
@@ -1066,6 +796,7 @@ export default function AdminDashboardPage() {
                   <span>Lista por Rango</span>
                 </button>
               </div>
+            </div>
             </div>
 
             {/* SUBVISTA 1: CALENDARIO VISUAL INTERACTIVO */}
@@ -1260,7 +991,13 @@ export default function AdminDashboardPage() {
                                 <strong className="text-pretty-wine-950 font-serif text-sm block">
                                   {b.clientName}
                                 </strong>
-                                <span>{b.serviceName} · Especialista: {b.professional?.name || 'Por asignar'}</span>
+                                <div className="flex flex-wrap items-center gap-1.5 mt-0.5">
+                                  <span>{b.serviceName}</span>
+                                  <span className="inline-flex items-center space-x-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-pretty-pink-100 text-pretty-wine-900 border border-pretty-pink-200">
+                                    <User className="w-2.5 h-2.5 text-pretty-pink-600" />
+                                    <span>{b.professional?.name || 'Sin asignar'}</span>
+                                  </span>
+                                </div>
                               </div>
                               <div className="sm:text-right">
                                 <span className="font-bold text-pretty-wine-900">{formatCRC(b.totalCRC)}</span>
@@ -1317,7 +1054,11 @@ export default function AdminDashboardPage() {
               <div className="space-y-3.5">
                 
                 {/* Filtros de la Vista en Lista con dimensiones idénticas en iOS */}
-                <div className="glass-panel rounded-2xl p-3 sm:p-4 grid grid-cols-1 sm:grid-cols-4 gap-2.5">
+                <div className={`glass-panel rounded-2xl p-3 sm:p-4 grid gap-2.5 ${
+                  currentUser?.role === 'OWNER'
+                    ? 'grid-cols-1 sm:grid-cols-2 lg:grid-cols-5'
+                    : 'grid-cols-1 sm:grid-cols-4'
+                }`}>
                   <div className="min-w-0">
                     <label className="block text-[11px] font-semibold text-pretty-wine-800 mb-1">
                       Fecha Inicio:
@@ -1341,6 +1082,30 @@ export default function AdminDashboardPage() {
                       className="w-full max-w-full h-10 px-3 py-2 rounded-xl border border-pretty-pink-200 bg-white text-xs font-medium min-w-0 box-border text-pretty-wine-900 focus:outline-none focus:ring-1 focus:ring-pretty-pink-400 appearance-none"
                     />
                   </div>
+
+                  {currentUser?.role === 'OWNER' && (
+                    <div className="min-w-0">
+                      <label className="block text-[11px] font-semibold text-pretty-wine-800 mb-1">
+                        Estilista:
+                      </label>
+                      <div className="relative">
+                        <select
+                          value={filterProfessionalId}
+                          onChange={(e) => setFilterProfessionalId(e.target.value)}
+                          className="w-full h-10 pl-3 pr-8 py-2 rounded-xl border border-pretty-pink-200 bg-white text-xs font-medium min-w-0 box-border text-pretty-wine-900 focus:outline-none focus:ring-1 focus:ring-pretty-pink-400 appearance-none"
+                        >
+                          <option value="">Todas las estilistas</option>
+                          {catalog?.professionals?.map((p: any) => (
+                            <option key={p.id} value={p.id}>
+                              {p.name}
+                            </option>
+                          ))}
+                          <option value="UNASSIGNED">Sin asignar</option>
+                        </select>
+                        <ChevronDown className="w-4 h-4 absolute right-3 top-3 text-pretty-wine-700 pointer-events-none" />
+                      </div>
+                    </div>
+                  )}
 
                   <div className="min-w-0">
                     <label className="block text-[11px] font-semibold text-pretty-wine-800 mb-1">
@@ -1411,14 +1176,20 @@ export default function AdminDashboardPage() {
                                 ({b.clientPhone})
                               </span>
                             </div>
-                            <div className="text-xs text-pretty-wine-800/80 mt-0.5">
-                              {new Date(b.startTime).toLocaleString('es-CR', {
-                                weekday: 'short',
-                                month: 'short',
-                                day: 'numeric',
-                                hour: '2-digit',
-                                minute: '2-digit'
-                              })} · {b.serviceName} · Especialista: {b.professional?.name || 'Por asignar'}
+                            <div className="flex flex-wrap items-center gap-1.5 text-xs text-pretty-wine-800/80 mt-0.5">
+                              <span>
+                                {new Date(b.startTime).toLocaleString('es-CR', {
+                                  weekday: 'short',
+                                  month: 'short',
+                                  day: 'numeric',
+                                  hour: '2-digit',
+                                  minute: '2-digit'
+                                })} · {b.serviceName}
+                              </span>
+                              <span className="inline-flex items-center space-x-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-pretty-pink-100 text-pretty-wine-900 border border-pretty-pink-200">
+                                <User className="w-2.5 h-2.5 text-pretty-pink-600" />
+                                <span>{b.professional?.name || 'Sin asignar'}</span>
+                              </span>
                             </div>
                           </div>
 
@@ -1517,9 +1288,10 @@ export default function AdminDashboardPage() {
                   <select
                     value={filterProfessionalId}
                     onChange={(e) => setFilterProfessionalId(e.target.value)}
-                    className="px-3 py-1.5 rounded-xl border border-pretty-pink-200 bg-white text-xs font-semibold"
+                    className="px-3 py-1.5 rounded-xl border border-pretty-pink-200 bg-white text-xs font-semibold text-pretty-wine-900"
                   >
-                    {catalog?.professionals.map((p: any) => (
+                    <option value="">Todas las estilistas</option>
+                    {catalog?.professionals?.map((p: any) => (
                       <option key={p.id} value={p.id}>
                         {p.name}
                       </option>
@@ -1701,6 +1473,35 @@ export default function AdminDashboardPage() {
         onClose={() => setIsPushModalOpen(false)}
         token={authToken}
         onStatusChange={(granted) => setNotifGranted(granted)}
+      />
+
+      {/* Drawer Menú Administrativo Slide-over Dinámico (Renderizado vía Portal en document.body) */}
+      <AdminMenuDrawer
+        isOpen={isMenuOpen}
+        onClose={() => setIsMenuOpen(false)}
+        currentUser={currentUser}
+        activeTab={activeTab}
+        setActiveTab={setActiveTab}
+        setFilterStatus={setFilterStatus}
+        pendingCount={pendingBookings.length}
+        notifGranted={notifGranted}
+        onOpenManualBooking={() => setIsManualBookingOpen(true)}
+        onOpenBlockTime={() => setIsBlockTimeOpen(true)}
+        onOpenDayAvail={() => {
+          setSelectedDateForAvail(undefined);
+          setIsDayAvailOpen(true);
+        }}
+        onOpenServices={() => setIsServicesOpen(true)}
+        onOpenLocations={() => setIsLocationsOpen(true)}
+        onOpenProfile={() => setIsProfileOpen(true)}
+        onOpenPushModal={() => setIsPushModalOpen(true)}
+        onInstallPwa={handleInstallPwa}
+        onShareCatalog={() => {
+          const url = typeof window !== 'undefined' ? `${window.location.origin}/#catalogo` : 'https://canonegropretty.com/#catalogo';
+          navigator.clipboard.writeText(url);
+          setActionSuccess('¡Enlace del catálogo (#catalogo) copiado!');
+        }}
+        onLogout={handleLogout}
       />
 
     </div>

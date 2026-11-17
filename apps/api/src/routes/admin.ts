@@ -27,10 +27,14 @@ adminRouter.get('/bookings', async (req, res) => {
     const { status, professionalId, date, startDate, endDate } = req.query;
     const user = req.user!;
 
-    // Si es personal regular, sólo puede ver su propia agenda (salvo que sea OWNER)
+    // Si es personal regular, sólo puede ver su propia agenda (la propietaria OWNER ve todas o filtra por estilista)
+    const rawProfId = typeof professionalId === 'string' && professionalId !== 'ALL' && professionalId.trim() !== ''
+      ? professionalId.trim()
+      : undefined;
+
     const filterProfessionalId = user.role === 'STAFF' && user.professionalId
       ? user.professionalId
-      : (typeof professionalId === 'string' ? professionalId : undefined);
+      : rawProfId;
 
     const whereClause: Prisma.BookingWhereInput = {
       businessId: user.businessId,
@@ -43,7 +47,11 @@ adminRouter.get('/bookings', async (req, res) => {
           { professionalId: null }
         ];
       } else {
-        whereClause.professionalId = filterProfessionalId;
+        if (filterProfessionalId === 'UNASSIGNED') {
+          whereClause.professionalId = null;
+        } else {
+          whereClause.professionalId = filterProfessionalId;
+        }
       }
     }
 

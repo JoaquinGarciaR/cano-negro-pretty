@@ -136,12 +136,12 @@ test.describe('Caño Negro Pretty - Mobile Layout & Responsiveness (iPhone 14 Vi
     await expect(page.locator('label:has-text("Bloque de Inicio:")')).toBeVisible();
 
     // Seleccionar un turno libre en la cuadrícula de 15 minutos si existe para la fecha
-    const slotBtn = page.locator('button:not([disabled])').filter({ hasText: /^\d{2}:\d{2}$/ }).first();
-    if (await slotBtn.isVisible().catch(() => false)) {
+    const slotBtn = page.locator('button[data-available="true"]').filter({ hasText: /^\d{2}:\d{2}$/ }).first();
+    if (await slotBtn.isVisible({ timeout: 2000 }).catch(() => false)) {
       await slotBtn.click({ force: true });
       await page.click('button:has-text("Confirmar Cita")');
     } else {
-      // Si la fecha actual no tiene jornada abierta, cerrar modal limpiamente
+      // Si la fecha actual no tiene turnos libres, cerrar modal limpiamente
       await page.click('button:has-text("Cancelar")');
     }
     await expect(page.getByRole('heading', { name: 'Ingresar Cita Manual' })).not.toBeVisible({ timeout: 10000 });
@@ -162,9 +162,30 @@ test.describe('Caño Negro Pretty - Mobile Layout & Responsiveness (iPhone 14 Vi
     await expect(page.locator('label:has-text("Fecha Fin:")')).toBeVisible();
     await expect(page.locator('input[placeholder*="Clienta o servicio"]')).toBeVisible();
 
-    // 7. Regresar al Calendario Visual y verificar cuadrícula
+    // 7. Verificar que la Propietaria cuenta con selector estilizado de estilista y ve todas las citas por defecto
+    const ownerStylistFilter = page.locator('button[title*="Filtrar agenda por estilista"]').first();
+    await expect(ownerStylistFilter).toBeVisible();
+    await expect(ownerStylistFilter).toContainText('Todas las Estilistas');
+
+    // Probar apertura del popover con estilo Pretty Salon
+    await ownerStylistFilter.click();
+    await expect(page.locator('text=Filtrar Citas del Salón')).toBeVisible();
+    await expect(page.locator('button:has-text("Sin asignar")').first()).toBeVisible();
+    await ownerStylistFilter.click(); // Cerrar popover
+
+    // 8. Regresar al Calendario Visual y verificar cuadrícula
     await calendarToggleBtn.click();
     await expect(page.locator('div:has-text("Dom")').first()).toBeVisible();
+
+    // 9. Regresar a Solicitudes y verificar dropdown estilizado de filtro para la propietaria
+    await page.click('button:has-text("Solicitudes")');
+    await expect(page.locator('text=Filtrar bandeja:')).toBeVisible();
+    const bandejaDropdown = page.locator('button[title*="Filtrar solicitudes"]').first();
+    await expect(bandejaDropdown).toBeVisible();
+    await expect(bandejaDropdown).toContainText('Todas las solicitudes');
+    await bandejaDropdown.click();
+    await expect(page.locator('button:has-text("Sin asignar")').first()).toBeVisible();
+    await bandejaDropdown.click(); // Cerrar dropdown
   });
 
   test('Direct catalog anchor navigation and /catalogo redirect', async ({ page }) => {
@@ -184,6 +205,26 @@ test.describe('Caño Negro Pretty - Mobile Layout & Responsiveness (iPhone 14 Vi
     await page.goto('/catalogo');
     await page.waitForURL('**/#catalogo');
     await expect(catalogHeading).toBeVisible();
+
+    // 4. Verificar que las etiquetas de Combo Especial no se solapan con el título del paquete
+    const comboBadge = page.locator('span:has-text("Combo Especial")').first();
+    const comboTitle = page.locator('h4:has-text("Combo Mirada & Manos Pretty")').first();
+    if (await comboBadge.isVisible()) {
+      const badgeBox = await comboBadge.boundingBox();
+      const titleBox = await comboTitle.boundingBox();
+      expect(badgeBox).not.toBeNull();
+      expect(titleBox).not.toBeNull();
+      if (badgeBox && titleBox) {
+        // Verificar que no haya colisión o solapamiento geométrico entre el título y la etiqueta
+        const hasOverlap = !(
+          titleBox.x + titleBox.width <= badgeBox.x ||
+          badgeBox.x + badgeBox.width <= titleBox.x ||
+          titleBox.y + titleBox.height <= badgeBox.y ||
+          badgeBox.y + badgeBox.height <= titleBox.y
+        );
+        expect(hasOverlap).toBe(false);
+      }
+    }
   });
 
   test('Admin Menu Drawer provides Profile and Service Management modals', async ({ page }) => {

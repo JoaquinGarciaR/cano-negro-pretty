@@ -62,6 +62,37 @@ export function ManualBookingModal({
   const [loading, setLoading] = useState<boolean>(false);
   const [error, setError] = useState<string | null>(null);
 
+  // Estados de interacción para validación estricta de campos obligatorios
+  const [touchedName, setTouchedName] = useState<boolean>(false);
+  const [touchedPhone, setTouchedPhone] = useState<boolean>(false);
+
+  // Reiniciar validaciones y advertencias al abrir el modal
+  useEffect(() => {
+    if (isOpen) {
+      setTouchedName(false);
+      setTouchedPhone(false);
+      setError(null);
+    }
+  }, [isOpen]);
+
+  // Validaciones en tiempo real
+  const isNameValid = clientName.trim().length >= 2;
+
+  const selectedCountry = useMemo(() => {
+    return SUPPORTED_COUNTRY_CODES.find((c) => c.code === countryCode) || {
+      code: '+506',
+      country: 'Costa Rica',
+      digits: 8
+    };
+  }, [countryCode]);
+
+  const cleanedPhone = useMemo(() => {
+    return cleanPhoneInput(clientPhone, countryCode);
+  }, [clientPhone, countryCode]);
+
+  const isPhoneValid = cleanedPhone.length === selectedCountry.digits;
+  const canSubmit = isNameValid && isPhoneValid && !!selectedStartTime && !loading;
+
   // Inicializar IDs por defecto en cuanto el catálogo esté disponible
   useEffect(() => {
     if (catalog && isOpen) {
@@ -190,21 +221,17 @@ export function ManualBookingModal({
     setLoading(true);
     setError(null);
 
-    if (!clientName.trim() || clientName.trim().length < 2) {
-      setError('El nombre de la clienta debe tener al menos 2 caracteres');
+    if (!isNameValid) {
+      setTouchedName(true);
+      setError('El nombre de la clienta es obligatorio (mínimo 2 caracteres).');
       setLoading(false);
       return;
     }
 
-    const selectedCountry = SUPPORTED_COUNTRY_CODES.find((c) => c.code === countryCode) || {
-      code: '+506',
-      country: 'Costa Rica',
-      digits: 8
-    };
-    const cleanedPhone = cleanPhoneInput(clientPhone, countryCode);
-    if (cleanedPhone.length !== selectedCountry.digits) {
+    if (!isPhoneValid) {
+      setTouchedPhone(true);
       setError(
-        `El número de teléfono debe tener ${selectedCountry.digits} dígitos para ${selectedCountry.country}`
+        `El número de teléfono celular es obligatorio y debe tener exactamente ${selectedCountry.digits} dígitos para ${selectedCountry.country}.`
       );
       setLoading(false);
       return;
@@ -305,26 +332,65 @@ export function ManualBookingModal({
 
         <form onSubmit={handleSubmit} className="space-y-3.5 text-xs">
           
-          {/* Nombre de la Clienta */}
+          {/* Nombre de la Clienta (Obligatorio) */}
           <div>
-            <label className="block font-semibold text-pretty-wine-900 mb-1">
-              Nombre de la clienta:
-            </label>
+            <div className="flex items-center justify-between mb-1">
+              <label className="font-semibold text-pretty-wine-900 flex items-center space-x-1">
+                <span>Nombre de la clienta:</span>
+                <span className="text-rose-600 font-bold" title="Campo obligatorio">* (Obligatorio)</span>
+              </label>
+              {touchedName && !isNameValid ? (
+                <span className="text-[10px] text-rose-600 font-semibold animate-fade-in">
+                  Mínimo 2 caracteres
+                </span>
+              ) : isNameValid ? (
+                <span className="text-[10px] text-emerald-700 font-semibold flex items-center space-x-0.5 animate-fade-in">
+                  <CheckCircle2 className="w-3 h-3 text-emerald-600" />
+                  <span>Válido</span>
+                </span>
+              ) : null}
+            </div>
             <input
               type="text"
               required
               placeholder="Ej: Sofía Chaves"
               value={clientName}
-              onChange={(e) => setClientName(e.target.value)}
-              className="w-full px-3 py-2 rounded-xl border border-pretty-pink-200 bg-white text-xs focus:ring-2 focus:ring-pretty-pink-400"
+              onChange={(e) => {
+                setClientName(e.target.value);
+                if (!touchedName) setTouchedName(true);
+              }}
+              onBlur={() => setTouchedName(true)}
+              className={`w-full px-3 py-2 rounded-xl border bg-white text-xs transition-all focus:outline-none focus:ring-2 ${
+                touchedName && !isNameValid
+                  ? 'border-rose-400 focus:ring-rose-300 bg-rose-50/20 text-rose-950'
+                  : isNameValid
+                  ? 'border-emerald-300 focus:ring-emerald-300'
+                  : 'border-pretty-pink-200 focus:ring-pretty-pink-400'
+              }`}
             />
           </div>
 
-          {/* Teléfono con Código de País */}
+          {/* Teléfono con Código de País (Obligatorio) */}
           <div>
-            <label className="block font-semibold text-pretty-wine-900 mb-1">
-              Teléfono Celular:
-            </label>
+            <div className="flex items-center justify-between mb-1">
+              <label className="font-semibold text-pretty-wine-900 flex items-center space-x-1">
+                <span>Teléfono Celular:</span>
+                <span className="text-rose-600 font-bold" title="Campo obligatorio">* (Obligatorio)</span>
+              </label>
+              {isPhoneValid ? (
+                <span className="text-[10px] text-emerald-700 font-semibold flex items-center space-x-0.5 animate-fade-in">
+                  <CheckCircle2 className="w-3 h-3 text-emerald-600" />
+                  <span>{selectedCountry.digits} dígitos completos</span>
+                </span>
+              ) : touchedPhone ? (
+                <span className="text-[10px] text-rose-600 font-semibold animate-fade-in">
+                  {cleanedPhone.length === 0
+                    ? 'Número celular obligatorio'
+                    : `Faltan ${selectedCountry.digits - cleanedPhone.length} dígitos`}
+                </span>
+              ) : null}
+            </div>
+
             <div className="flex space-x-2">
               <select
                 value={countryCode}
@@ -345,20 +411,34 @@ export function ManualBookingModal({
               <input
                 type="tel"
                 required
-                maxLength={12}
-                placeholder={countryCode === '+506' ? '88887777 (8 dígitos)' : 'Número celular'}
+                maxLength={selectedCountry.digits}
+                placeholder={countryCode === '+506' ? '88887777 (8 dígitos)' : `${selectedCountry.digits} dígitos`}
                 value={clientPhone}
                 onChange={(e) => {
                   setClientPhone(cleanPhoneInput(e.target.value, countryCode));
+                  if (!touchedPhone) setTouchedPhone(true);
                 }}
-                className="flex-1 px-3 py-2 rounded-xl border border-pretty-pink-200 bg-white text-xs focus:ring-2 focus:ring-pretty-pink-400 font-mono"
+                onBlur={() => setTouchedPhone(true)}
+                className={`flex-1 px-3 py-2 rounded-xl border bg-white text-xs focus:outline-none focus:ring-2 font-mono transition-all ${
+                  touchedPhone && !isPhoneValid
+                    ? 'border-rose-400 focus:ring-rose-300 bg-rose-50/20 text-rose-950'
+                    : isPhoneValid
+                    ? 'border-emerald-300 focus:ring-emerald-300'
+                    : 'border-pretty-pink-200 focus:ring-pretty-pink-400'
+                }`}
               />
             </div>
-            <span className="text-[10px] text-pretty-wine-700/70 mt-0.5 block">
-              {countryCode === '+506'
-                ? 'Para Costa Rica ingrese exactamente 8 dígitos numéricos.'
-                : 'Ingrese los dígitos nacionales del teléfono.'}
-            </span>
+
+            <div className="mt-1 flex items-center justify-between text-[10px]">
+              <span className={touchedPhone && !isPhoneValid ? 'text-rose-700 font-medium' : 'text-pretty-wine-700/70'}>
+                {countryCode === '+506'
+                  ? 'Para Costa Rica ingrese exactamente 8 dígitos numéricos.'
+                  : `${selectedCountry.country}: ingrese exactamente ${selectedCountry.digits} dígitos.`}
+              </span>
+              <span className={`font-mono font-bold ${isPhoneValid ? 'text-emerald-700' : 'text-pretty-wine-700/60'}`}>
+                {cleanedPhone.length}/{selectedCountry.digits}
+              </span>
+            </div>
           </div>
 
           {/* Selección de Tratamiento */}
@@ -572,6 +652,10 @@ export function ManualBookingModal({
 
             {/* Indicador del Bloque Inicial Elegido */}
             <div className="min-w-0">
+              <label className="block font-semibold text-pretty-wine-900 mb-1 flex items-center space-x-1">
+                <Clock className="w-3.5 h-3.5 text-pretty-pink-500" />
+                <span>Bloque de Inicio:</span>
+              </label>
               <div
                 className={`w-full h-9 px-3 py-1.5 rounded-xl border flex items-center justify-between text-xs font-bold transition-all ${
                   selectedStartTime
@@ -652,6 +736,7 @@ export function ManualBookingModal({
                       <button
                         key={slot.startTime}
                         type="button"
+                        data-available={slot.available ? "true" : "false"}
                         onClick={() => {
                           if (!slot.available) {
                             setSlotWarning(
@@ -806,12 +891,21 @@ export function ManualBookingModal({
             </button>
             <button
               type="submit"
-              disabled={loading || !selectedStartTime}
+              disabled={!canSubmit}
               className={`px-5 py-2 rounded-full text-xs font-bold text-white transition-all shadow-sm ${
-                !selectedStartTime || loading
+                !canSubmit
                   ? 'opacity-50 bg-pretty-wine-900/60 cursor-not-allowed'
-                  : 'bg-pretty-wine-900 hover:bg-pretty-pink-600'
+                  : 'bg-pretty-wine-900 hover:bg-pretty-pink-600 active:scale-95'
               }`}
+              title={
+                !isNameValid
+                  ? 'El nombre de la clienta es obligatorio'
+                  : !isPhoneValid
+                  ? `El teléfono celular es obligatorio (${selectedCountry.digits} dígitos)`
+                  : !selectedStartTime
+                  ? 'Seleccione un bloque de inicio disponible'
+                  : 'Confirmar Cita'
+              }
             >
               {loading ? 'Guardando...' : 'Confirmar Cita'}
             </button>
