@@ -1,2 +1,13 @@
+providers = ["node"]
+
+[phases.setup]
+nixPkgs = ["...", "nodejs_20", "pnpm"]
+
 [phases.install]
 cmds = ["pnpm install --prod=false"]
+
+[phases.build]
+cmds = ["pnpm run build:api"]
+
+[start]
+cmd = "pnpm --filter @cano/api start"
