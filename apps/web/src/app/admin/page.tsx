@@ -299,11 +299,24 @@ export default function AdminDashboardPage() {
       await updateBookingStatusApi(bookingId, newStatus, undefined, authToken);
       setActionSuccess(`Reserva actualizada a estado: ${newStatus}`);
       
-      // Si se confirmó, abrir automáticamente el modal de WhatsApp
+      // Si se confirmó, abrir automáticamente el modal de WhatsApp con la plantilla de confirmación
       if (newStatus === 'CONFIRMED') {
         const confirmedBooking = bookings.find((b) => b.id === bookingId);
         if (confirmedBooking) {
           setSelectedBookingForWa({ ...confirmedBooking, status: 'CONFIRMED' });
+          setWaInitialTemplate('confirmation');
+          setPreviousScheduleForWa(undefined);
+          setIsWaOpen(true);
+        }
+      }
+
+      // Si se canceló o rechazó, abrir automáticamente el modal de WhatsApp con la plantilla de cancelación
+      if (newStatus === 'CANCELLED' || newStatus === 'REJECTED') {
+        const targetBooking = bookings.find((b) => b.id === bookingId);
+        if (targetBooking) {
+          setSelectedBookingForWa({ ...targetBooking, status: newStatus });
+          setWaInitialTemplate('cancellation');
+          setPreviousScheduleForWa(undefined);
           setIsWaOpen(true);
         }
       }
@@ -755,8 +768,13 @@ export default function AdminDashboardPage() {
                           </button>
 
                           <button
-                            onClick={() => handleStatusChange(b.id, 'REJECTED')}
-                            className="inline-flex items-center space-x-1 px-2.5 py-1.5 rounded-full text-xs font-semibold text-rose-700 hover:bg-rose-50 border border-rose-200"
+                            type="button"
+                            onClick={() => {
+                              if (window.confirm(`¿Deseas rechazar la solicitud de cita #${b.referenceCode}? Se abrirá WhatsApp para notificar a la clienta.`)) {
+                                handleStatusChange(b.id, 'REJECTED');
+                              }
+                            }}
+                            className="inline-flex items-center space-x-1 px-2.5 py-1.5 rounded-full text-xs font-semibold text-rose-700 hover:bg-rose-50 border border-rose-200 transition-all"
                           >
                             <XCircle className="w-3.5 h-3.5" />
                             <span>Rechazar</span>
@@ -1118,10 +1136,15 @@ export default function AdminDashboardPage() {
                                   </button>
 
                                   <button
-                                    onClick={() => handleStatusChange(b.id, 'CANCELLED')}
-                                    className="inline-flex items-center space-x-1 px-2.5 py-1 rounded-full text-xs font-semibold text-gray-700 hover:bg-gray-100"
+                                    type="button"
+                                    onClick={() => {
+                                      if (window.confirm(`¿Estás segura de cancelar la cita #${b.referenceCode}? Se abrirá WhatsApp con el mensaje de cancelación listo para la clienta.`)) {
+                                        handleStatusChange(b.id, 'CANCELLED');
+                                      }
+                                    }}
+                                    className="inline-flex items-center space-x-1 px-2.5 py-1 rounded-full text-xs font-semibold text-rose-700 bg-rose-50 hover:bg-rose-100 border border-rose-200 transition-all"
                                   >
-                                    <Ban className="w-3 h-3" />
+                                    <Ban className="w-3 h-3 text-rose-600" />
                                     <span>Cancelar</span>
                                   </button>
                                 </>
@@ -1352,11 +1375,16 @@ export default function AdminDashboardPage() {
                                 <span>Completar</span>
                               </button>
 
-                              <button
-                                onClick={() => handleStatusChange(b.id, 'CANCELLED')}
-                                className="inline-flex items-center space-x-1 px-2.5 py-1 rounded-full text-xs font-semibold text-gray-700 hover:bg-gray-100"
+                               <button
+                                type="button"
+                                onClick={() => {
+                                  if (window.confirm(`¿Estás segura de cancelar la cita #${b.referenceCode}? Se abrirá WhatsApp con el mensaje de cancelación listo para la clienta.`)) {
+                                    handleStatusChange(b.id, 'CANCELLED');
+                                  }
+                                }}
+                                className="inline-flex items-center space-x-1 px-2.5 py-1 rounded-full text-xs font-semibold text-rose-700 bg-rose-50 hover:bg-rose-100 border border-rose-200 transition-all"
                               >
-                                <Ban className="w-3 h-3" />
+                                <Ban className="w-3 h-3 text-rose-600" />
                                 <span>Cancelar</span>
                               </button>
                             </>

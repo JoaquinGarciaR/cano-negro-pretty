@@ -1,16 +1,17 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { X, MessageSquare, Copy, ExternalLink, Check, AlertCircle, Sparkles, CalendarClock, Bell, CheckCircle2 } from 'lucide-react';
+import { X, MessageSquare, Copy, ExternalLink, Check, AlertCircle, Sparkles, CalendarClock, Bell, CheckCircle2, Ban } from 'lucide-react';
 import {
   buildWhatsAppMessage,
   buildWhatsAppRescheduleMessage,
   buildWhatsAppReminderMessage,
+  buildWhatsAppCancellationMessage,
   buildWhatsAppLink,
   WhatsAppVoice
 } from '@cano/shared';
 
-export type WhatsAppTemplateType = 'confirmation' | 'reschedule' | 'reminder';
+export type WhatsAppTemplateType = 'confirmation' | 'reschedule' | 'reminder' | 'cancellation';
 
 interface WhatsAppModalProps {
   isOpen: boolean;
@@ -29,6 +30,7 @@ export function WhatsAppModal({
 }: WhatsAppModalProps) {
   const [templateType, setTemplateType] = useState<WhatsAppTemplateType>(initialTemplate);
   const [voice, setVoice] = useState<WhatsAppVoice>('AS_PROFESSIONAL');
+  const [cancellationReason, setCancellationReason] = useState<string>('');
   const [editableMessage, setEditableMessage] = useState<string>('');
   const [copied, setCopied] = useState<boolean>(false);
 
@@ -89,6 +91,18 @@ export function WhatsAppModal({
           totalCRC: booking.totalCRC || booking.snapshotTotalCRC,
           referenceCode: booking.referenceCode
         });
+      } else if (templateType === 'cancellation') {
+        generated = buildWhatsAppCancellationMessage({
+          voice,
+          clientName: booking.clientName,
+          clientPhone: booking.clientPhone,
+          professionalName: booking.professional?.name || 'Esteticista',
+          serviceName: booking.serviceName || booking.snapshotServiceName,
+          formattedDate,
+          formattedTime,
+          referenceCode: booking.referenceCode,
+          reason: cancellationReason
+        });
       } else {
         generated = buildWhatsAppMessage({
           voice,
@@ -110,7 +124,7 @@ export function WhatsAppModal({
       setEditableMessage(generated);
       setCopied(false);
     }
-  }, [booking, voice, templateType, previousSchedule]);
+  }, [booking, voice, templateType, previousSchedule, cancellationReason]);
 
   if (!isOpen || !booking) return null;
 
@@ -143,6 +157,8 @@ export function WhatsAppModal({
               ? 'Mensaje de Cambio de Horario'
               : templateType === 'reminder'
               ? 'Mensaje de Recordatorio'
+              : templateType === 'cancellation'
+              ? 'Mensaje de Cancelación de Cita'
               : 'Mensaje de Confirmación'}
           </h3>
           <p className="text-xs text-pretty-wine-800/80 mt-0.5">
@@ -155,7 +171,7 @@ export function WhatsAppModal({
           <label className="block text-xs font-semibold text-pretty-wine-900 mb-1.5">
             Plantilla de mensaje:
           </label>
-          <div className="grid grid-cols-3 gap-1.5 p-1 rounded-2xl bg-pretty-pink-100/70 border border-pretty-pink-200/60">
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-1.5 p-1 rounded-2xl bg-pretty-pink-100/70 border border-pretty-pink-200/60">
             <button
               type="button"
               onClick={() => setTemplateType('confirmation')}
@@ -192,8 +208,36 @@ export function WhatsAppModal({
               <Bell className="w-3 h-3 text-amber-500" />
               <span>Recordatorio</span>
             </button>
+            <button
+              type="button"
+              onClick={() => setTemplateType('cancellation')}
+              className={`flex items-center justify-center space-x-1 py-1.5 px-2 rounded-xl text-xs font-bold transition-all ${
+                templateType === 'cancellation'
+                  ? 'bg-rose-700 text-white shadow-sm'
+                  : 'text-pretty-wine-900 hover:bg-white/60'
+              }`}
+            >
+              <Ban className="w-3 h-3 text-rose-500" />
+              <span>Cancelación</span>
+            </button>
           </div>
         </div>
+
+        {/* Motivo de Cancelación (Si la plantilla es Cancelación) */}
+        {templateType === 'cancellation' && (
+          <div className="mb-3.5">
+            <label className="block text-xs font-semibold text-pretty-wine-900 mb-1">
+              Motivo o justificación de cancelación (opcional):
+            </label>
+            <input
+              type="text"
+              placeholder="Ej: Imprevisto de fuerza mayor en el salón / Emergencia familiar"
+              value={cancellationReason}
+              onChange={(e) => setCancellationReason(e.target.value)}
+              className="w-full px-3 py-1.5 rounded-xl border border-rose-200 bg-white text-xs text-pretty-wine-900 focus:outline-none focus:ring-2 focus:ring-rose-400"
+            />
+          </div>
+        )}
 
         {/* Selector de Voz */}
         <div className="mb-3.5">

@@ -234,6 +234,57 @@ export function buildWhatsAppReminderMessage(params: WhatsAppReminderParams): st
   ].join('\n');
 }
 
+export interface WhatsAppCancellationParams {
+  voice: WhatsAppVoice;
+  clientName: string;
+  clientPhone: string;
+  professionalName: string;
+  serviceName: string;
+  formattedDate: string; // ej: "Lunes 30 de Noviembre"
+  formattedTime: string; // ej: "08:00 a. m."
+  referenceCode: string;
+  reason?: string;
+}
+
+/**
+ * Genera el texto del mensaje de cancelación de cita para WhatsApp.
+ */
+export function buildWhatsAppCancellationMessage(params: WhatsAppCancellationParams): string {
+  const {
+    voice,
+    clientName,
+    professionalName,
+    serviceName,
+    formattedDate,
+    formattedTime,
+    referenceCode,
+    reason
+  } = params;
+
+  const greeting = voice === 'AS_PROFESSIONAL'
+    ? `¡Hola, ${clientName}! Soy ${professionalName} de Caño Negro Pretty.`
+    : `¡Hola, ${clientName}! Te saludamos de Caño Negro Pretty.`;
+
+  const reasonLine = reason && reason.trim()
+    ? `Motivo: ${reason.trim()}`
+    : null;
+
+  const lines = [
+    greeting,
+    '',
+    `Te informamos que tu cita #${referenceCode} agendada para el ${formattedDate} a las ${formattedTime} (${serviceName}) ha sido cancelada.`,
+    reasonLine,
+    '',
+    'Lamentamos cualquier inconveniente que esto te pueda causar. Si deseas reprogramarla para otra fecha u horario que te quede cómodo, con muchísimo gusto estamos a tu disposición por este medio o en nuestro sitio web.',
+    '',
+    '¡Esperamos tener el placer de atenderte muy pronto!',
+    '',
+    voice === 'AS_PROFESSIONAL' ? `Con cariño, ${professionalName}` : 'Con cariño, el equipo de Caño Negro Pretty'
+  ].filter((l) => l !== null);
+
+  return lines.join('\n');
+}
+
 /**
  * Crea el link directo https://wa.me/...
  */
