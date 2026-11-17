@@ -18,6 +18,8 @@ export type WhatsAppTemplateType = 'confirmation' | 'reschedule' | 'reminder' | 
 
 interface BookingActionMenuProps {
   booking: any;
+  isOpen?: boolean;
+  onOpenChange?: (open: boolean) => void;
   onReschedule?: (booking: any) => void;
   onWhatsApp?: (booking: any, template?: WhatsAppTemplateType) => void;
   onStatusChange?: (bookingId: string, newStatus: string) => void | Promise<void>;
@@ -28,6 +30,8 @@ interface BookingActionMenuProps {
 
 export function BookingActionMenu({
   booking,
+  isOpen: isOpenProp,
+  onOpenChange,
   onReschedule,
   onWhatsApp,
   onStatusChange,
@@ -35,18 +39,66 @@ export function BookingActionMenu({
   align = 'right',
   className = ''
 }: BookingActionMenuProps) {
-  const [isOpen, setIsOpen] = useState(false);
+  const [internalIsOpen, setInternalIsOpen] = useState(false);
+  const isControlled = typeof isOpenProp === 'boolean';
+  const isOpen = isControlled ? isOpenProp : internalIsOpen;
+
+  const [placement, setPlacement] = useState<'top' | 'bottom'>('bottom');
   const containerRef = useRef<HTMLDivElement>(null);
+
+  const calculatePlacement = () => {
+    if (containerRef.current) {
+      const rect = containerRef.current.getBoundingClientRect();
+      const spaceBelow = window.innerHeight - rect.bottom;
+      // Si hay menos de 250px hacia abajo y suficiente espacio arriba, desplegar hacia arriba
+      if (spaceBelow < 250 && rect.top > 250) {
+        setPlacement('top');
+      } else {
+        setPlacement('bottom');
+      }
+    }
+  };
+
+  const handleOpenChange = (nextOpen: boolean) => {
+    if (nextOpen) {
+      calculatePlacement();
+    }
+    if (!isControlled) {
+      setInternalIsOpen(nextOpen);
+    }
+    onOpenChange?.(nextOpen);
+  };
+
+  useEffect(() => {
+    if (isOpen) {
+      calculatePlacement();
+    }
+  }, [isOpen]);
+
+  useEffect(() => {
+    if (!isOpen) return;
+
+    const handleUpdate = () => {
+      calculatePlacement();
+    };
+
+    window.addEventListener('resize', handleUpdate);
+    window.addEventListener('scroll', handleUpdate, true);
+    return () => {
+      window.removeEventListener('resize', handleUpdate);
+      window.removeEventListener('scroll', handleUpdate, true);
+    };
+  }, [isOpen]);
 
   useEffect(() => {
     function handleClickOutside(e: MouseEvent | TouchEvent) {
       if (containerRef.current && !containerRef.current.contains(e.target as Node)) {
-        setIsOpen(false);
+        handleOpenChange(false);
       }
     }
     function handleKeyDown(e: KeyboardEvent) {
       if (e.key === 'Escape') {
-        setIsOpen(false);
+        handleOpenChange(false);
       }
     }
     if (isOpen) {
@@ -70,11 +122,11 @@ export function BookingActionMenu({
   const isUnassigned = !booking.professionalId && !booking.professional?.id;
 
   function closeMenu() {
-    setIsOpen(false);
+    handleOpenChange(false);
   }
 
   return (
-    <div className={`relative inline-flex items-center gap-1.5 ${className}`} ref={containerRef}>
+    <div className={`relative inline-flex items-center gap-1.5 ${isOpen ? 'z-40' : 'z-auto'} ${className}`} ref={containerRef}>
       {/* ===================================================================== */}
       {/* 1. BOTÓN DE ACCIÓN PRIMARIA DIRECTA (Acceso Rápido de 1 Toque) */}
       {/* ===================================================================== */}
@@ -150,7 +202,7 @@ export function BookingActionMenu({
       {(!isCompleted && !isCancelled && !isRejected) ? (
         <button
           type="button"
-          onClick={() => setIsOpen((prev) => !prev)}
+          onClick={() => handleOpenChange(!isOpen)}
           className={`inline-flex items-center space-x-1 px-2.5 py-1 rounded-full text-xs font-semibold border transition-all shadow-xs ${
             isOpen
               ? 'bg-pretty-pink-100 text-pretty-wine-950 border-pretty-pink-300 ring-2 ring-pretty-pink-300/40'
@@ -165,7 +217,7 @@ export function BookingActionMenu({
         // En citas completadas, un menú sutil de 3 puntos por si desea WhatsApp regular u otras consultas
         <button
           type="button"
-          onClick={() => setIsOpen((prev) => !prev)}
+          onClick={() => handleOpenChange(!isOpen)}
           className={`p-1.5 rounded-full text-xs border transition-all ${
             isOpen
               ? 'bg-pretty-pink-100 text-pretty-wine-950 border-pretty-pink-300'
@@ -182,9 +234,12 @@ export function BookingActionMenu({
       {/* ===================================================================== */}
       {isOpen && (
         <div
-          className={`absolute top-full mt-1.5 ${
+          className={`absolute ${
+            placement === 'top' ? 'bottom-full mb-1.5' : 'top-full mt-1.5'
+          } ${
             align === 'right' ? 'right-0' : 'left-0'
-          } z-40 w-56 p-1.5 rounded-2xl bg-white/95 backdrop-blur-md shadow-xl border border-pretty-pink-200/80 text-pretty-wine-900 animate-fadeIn`}
+          } z-50 w-56 p-1.5 rounded-2xl bg-white shadow-2xl border border-pretty-pink-300 ring-1 ring-pretty-wine-900/10 text-pretty-wine-900`}
+          style={{ backgroundColor: '#ffffff', opacity: 1 }}
         >
           {/* Encabezado informativo del menú */}
           <div className="px-2.5 py-1 text-[10px] font-bold uppercase tracking-wider text-pretty-wine-700/70 border-b border-pretty-pink-100 mb-1">

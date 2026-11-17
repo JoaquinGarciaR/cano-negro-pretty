@@ -130,6 +130,14 @@ export default function AdminDashboardPage() {
   const [availabilityViewMode, setAvailabilityViewMode] = useState<'calendar' | 'list'>('calendar');
   const [availabilityModalMode, setAvailabilityModalMode] = useState<'single' | 'batch'>('single');
 
+  // Control de dropdown de acciones de citas (evita solapamientos entre tarjetas)
+  const [openMenuBookingId, setOpenMenuBookingId] = useState<string | null>(null);
+
+  // Cerrar cualquier menú de cita al cambiar de pestaña o filtros
+  useEffect(() => {
+    setOpenMenuBookingId(null);
+  }, [activeTab, filterDate, agendaViewMode]);
+
   // Retroalimentación de acciones
   const [actionError, setActionError] = useState<string | null>(null);
   const [actionSuccess, setActionSuccess] = useState<string | null>(null);
@@ -448,7 +456,7 @@ export default function AdminDashboardPage() {
       )}
 
       {/* Cabecera Backoffice Mobile-First con Logo y Menú Integrado */}
-      <header className="sticky top-0 z-30 glass-panel border-b border-white/60">
+      <header className="sticky top-0 z-40 glass-panel border-b border-white/60">
         <div className="max-w-5xl mx-auto px-3 sm:px-4 h-14 sm:h-16 flex items-center justify-between">
           {/* Logo y Marca que NUNCA se desborda ni se trunca */}
           <Link href="/" className="flex items-center space-x-2 min-w-0 mr-2 group">
@@ -631,6 +639,7 @@ export default function AdminDashboardPage() {
             ) : (
               <div className="space-y-3">
                 {pendingBookings.map((b) => {
+                  const isMenuOpen = openMenuBookingId === b.id;
                   const assignedProfId = b.professionalId || b.professional?.id;
                   const isUnassigned = !assignedProfId;
                   const canSelfAssign = currentUser?.professional?.id && (isUnassigned || assignedProfId !== currentUser.professional.id);
@@ -638,7 +647,9 @@ export default function AdminDashboardPage() {
                   return (
                     <div
                       key={b.id}
-                      className={`glass-panel rounded-2xl p-3.5 sm:p-5 transition-all border ${
+                      className={`glass-panel rounded-2xl p-3.5 sm:p-5 transition-all border relative ${
+                        isMenuOpen ? 'z-30' : 'z-0'
+                      } ${
                         b.hasConflict
                           ? 'border-amber-400/80 bg-amber-50/50'
                           : isUnassigned
@@ -768,6 +779,8 @@ export default function AdminDashboardPage() {
                         <div className="flex items-center justify-end">
                           <BookingActionMenu
                             booking={b}
+                            isOpen={isMenuOpen}
+                            onOpenChange={(open) => setOpenMenuBookingId(open ? b.id : null)}
                             onAssign={(booking) => {
                               setSelectedBookingForAssign(booking);
                               setIsAssignOpen(true);
@@ -997,6 +1010,7 @@ export default function AdminDashboardPage() {
                   ) : (
                     <div className="space-y-2.5">
                       {calendarDayBookings.map((b) => {
+                        const isMenuOpen = openMenuBookingId === b.id;
                         const startTimeStr = new Date(b.startTime).toLocaleTimeString('es-CR', {
                           hour: '2-digit',
                           minute: '2-digit'
@@ -1009,7 +1023,9 @@ export default function AdminDashboardPage() {
                         return (
                           <div
                             key={b.id}
-                            className="glass-panel rounded-2xl p-3.5 sm:p-4 border border-white/80 space-y-2"
+                            className={`glass-panel rounded-2xl p-3.5 sm:p-4 border border-white/80 space-y-2 relative transition-all ${
+                              isMenuOpen ? 'z-30' : 'z-0'
+                            }`}
                           >
                             <div className="flex items-center justify-between">
                               <div className="flex items-center space-x-2">
@@ -1079,6 +1095,8 @@ export default function AdminDashboardPage() {
                             <div className="pt-2 flex items-center justify-end border-t border-pretty-pink-100">
                               <BookingActionMenu
                                 booking={b}
+                                isOpen={isMenuOpen}
+                                onOpenChange={(open) => setOpenMenuBookingId(open ? b.id : null)}
                                 onAssign={(booking) => {
                                   setSelectedBookingForAssign(booking);
                                   setIsAssignOpen(true);
@@ -1214,97 +1232,104 @@ export default function AdminDashboardPage() {
                       No hay citas para el rango y filtros seleccionados.
                     </div>
                   ) : (
-                    listRangeBookings.map((b) => (
-                      <div
-                        key={b.id}
-                        className="glass-panel rounded-2xl p-3 sm:p-4 border border-white/80 space-y-2"
-                      >
-                        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1.5">
-                          <div>
-                            <div className="flex items-center space-x-2">
-                              <span className="font-mono text-xs font-bold text-pretty-wine-700 bg-white px-1.5 py-0.5 rounded border border-pretty-pink-200">
-                                #{b.referenceCode}
-                              </span>
-                              <span className="font-serif text-sm font-bold text-pretty-wine-900">
-                                {b.clientName}
-                              </span>
-                              <span className="text-xs text-pretty-wine-700/80 font-mono">
-                                ({b.clientPhone})
-                              </span>
+                    listRangeBookings.map((b) => {
+                      const isMenuOpen = openMenuBookingId === b.id;
+                      return (
+                        <div
+                          key={b.id}
+                          className={`glass-panel rounded-2xl p-3 sm:p-4 border border-white/80 space-y-2 relative transition-all ${
+                            isMenuOpen ? 'z-30' : 'z-0'
+                          }`}
+                        >
+                          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1.5">
+                            <div>
+                              <div className="flex items-center space-x-2">
+                                <span className="font-mono text-xs font-bold text-pretty-wine-700 bg-white px-1.5 py-0.5 rounded border border-pretty-pink-200">
+                                  #{b.referenceCode}
+                                </span>
+                                <span className="font-serif text-sm font-bold text-pretty-wine-900">
+                                  {b.clientName}
+                                </span>
+                                <span className="text-xs text-pretty-wine-700/80 font-mono">
+                                  ({b.clientPhone})
+                                </span>
+                              </div>
+                              <div className="flex flex-wrap items-center gap-1.5 text-xs text-pretty-wine-800/80 mt-0.5">
+                                <span>
+                                  {new Date(b.startTime).toLocaleString('es-CR', {
+                                    weekday: 'short',
+                                    month: 'short',
+                                    day: 'numeric',
+                                    hour: '2-digit',
+                                    minute: '2-digit'
+                                  })} · {b.serviceName}
+                                </span>
+                                <span className="inline-flex items-center space-x-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-pretty-pink-100 text-pretty-wine-900 border border-pretty-pink-200">
+                                  <User className="w-2.5 h-2.5 text-pretty-pink-600" />
+                                  <span>{b.professional?.name || 'Sin asignar'}</span>
+                                </span>
+                              </div>
                             </div>
-                            <div className="flex flex-wrap items-center gap-1.5 text-xs text-pretty-wine-800/80 mt-0.5">
-                              <span>
-                                {new Date(b.startTime).toLocaleString('es-CR', {
-                                  weekday: 'short',
-                                  month: 'short',
-                                  day: 'numeric',
-                                  hour: '2-digit',
-                                  minute: '2-digit'
-                                })} · {b.serviceName}
+
+                            <div className="flex items-center space-x-2 justify-between sm:justify-end">
+                              <span className="font-bold text-xs text-pretty-wine-900">
+                                {formatCRC(b.totalCRC)}
                               </span>
-                              <span className="inline-flex items-center space-x-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-pretty-pink-100 text-pretty-wine-900 border border-pretty-pink-200">
-                                <User className="w-2.5 h-2.5 text-pretty-pink-600" />
-                                <span>{b.professional?.name || 'Sin asignar'}</span>
-                              </span>
+
+                              {b.status === 'CONFIRMED' && (
+                                <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-100 text-emerald-800 border border-emerald-200">
+                                  Confirmada
+                                </span>
+                              )}
+                              {b.status === 'PENDING' && (
+                                <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-100 text-amber-800 border border-amber-200">
+                                  Pendiente
+                                </span>
+                              )}
+                              {b.status === 'COMPLETED' && (
+                                <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-pretty-pink-100 text-pretty-wine-900 border border-pretty-pink-300">
+                                  Completada
+                                </span>
+                              )}
+                              {b.status === 'CANCELLED' && (
+                                <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-gray-100 text-gray-700">
+                                  Cancelada
+                                </span>
+                              )}
+                              {b.status === 'REJECTED' && (
+                                <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-rose-100 text-rose-800">
+                                  Rechazada
+                                </span>
+                              )}
                             </div>
                           </div>
 
-                          <div className="flex items-center space-x-2 justify-between sm:justify-end">
-                            <span className="font-bold text-xs text-pretty-wine-900">
-                              {formatCRC(b.totalCRC)}
-                            </span>
-
-                            {b.status === 'CONFIRMED' && (
-                              <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-100 text-emerald-800 border border-emerald-200">
-                                Confirmada
-                              </span>
-                            )}
-                            {b.status === 'PENDING' && (
-                              <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-100 text-amber-800 border border-amber-200">
-                                Pendiente
-                              </span>
-                            )}
-                            {b.status === 'COMPLETED' && (
-                              <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-pretty-pink-100 text-pretty-wine-900 border border-pretty-pink-300">
-                                Completada
-                              </span>
-                            )}
-                            {b.status === 'CANCELLED' && (
-                              <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-gray-100 text-gray-700">
-                                Cancelada
-                              </span>
-                            )}
-                            {b.status === 'REJECTED' && (
-                              <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-rose-100 text-rose-800">
-                                Rechazada
-                              </span>
-                            )}
+                          {/* Acciones contextuales encapsuladas en Dropdown */}
+                          <div className="pt-2 flex items-center justify-end border-t border-pretty-pink-100">
+                            <BookingActionMenu
+                              booking={b}
+                              isOpen={isMenuOpen}
+                              onOpenChange={(open) => setOpenMenuBookingId(open ? b.id : null)}
+                              onAssign={(booking) => {
+                                setSelectedBookingForAssign(booking);
+                                setIsAssignOpen(true);
+                              }}
+                              onReschedule={(booking) => {
+                                setSelectedBookingForReschedule(booking);
+                                setIsRescheduleOpen(true);
+                              }}
+                              onWhatsApp={(booking, template) => {
+                                setSelectedBookingForWa(booking);
+                                setWaInitialTemplate(template || (b.status === 'COMPLETED' ? 'completed' : 'confirmation'));
+                                setPreviousScheduleForWa(undefined);
+                                setIsWaOpen(true);
+                              }}
+                              onStatusChange={handleStatusChange}
+                            />
                           </div>
                         </div>
-
-                        {/* Acciones contextuales encapsuladas en Dropdown */}
-                        <div className="pt-2 flex items-center justify-end border-t border-pretty-pink-100">
-                          <BookingActionMenu
-                            booking={b}
-                            onAssign={(booking) => {
-                              setSelectedBookingForAssign(booking);
-                              setIsAssignOpen(true);
-                            }}
-                            onReschedule={(booking) => {
-                              setSelectedBookingForReschedule(booking);
-                              setIsRescheduleOpen(true);
-                            }}
-                            onWhatsApp={(booking, template) => {
-                              setSelectedBookingForWa(booking);
-                              setWaInitialTemplate(template || (b.status === 'COMPLETED' ? 'completed' : 'confirmation'));
-                              setPreviousScheduleForWa(undefined);
-                              setIsWaOpen(true);
-                            }}
-                            onStatusChange={handleStatusChange}
-                          />
-                        </div>
-                      </div>
-                    ))
+                      );
+                    })
                   )}
                 </div>
 
