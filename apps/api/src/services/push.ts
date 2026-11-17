@@ -17,7 +17,11 @@ export function getVapidPublicKey(): string {
   return VAPID_PUBLIC_KEY;
 }
 
-export async function sendPushToUser(userId: string, payload: { title: string; body: string; url?: string }) {
+export async function sendPushToUser(
+  userId: string,
+  payload: { title: string; body: string; url?: string },
+  options?: { urgency?: 'very-low' | 'low' | 'normal' | 'high'; ttl?: number; topic?: string }
+) {
   const subscriptions = await prisma.pushSubscription.findMany({
     where: { userId }
   });
@@ -35,7 +39,14 @@ export async function sendPushToUser(userId: string, payload: { title: string; b
             auth: sub.auth
           }
         },
-        payloadString
+        payloadString,
+        {
+          // 'high' fuerza entrega inmediata en Apple APNs (iOS) y Google FCM (Android),
+          // evitando que el SO del iPhone ponga la notificación en cola para ahorrar batería.
+          urgency: options?.urgency || 'high',
+          TTL: options?.ttl ?? 86400, // 24 horas de retención en caso de pérdida temporal de señal
+          topic: options?.topic
+        }
       );
       sentCount++;
     } catch (err: any) {
