@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { X, MessageSquare, Copy, ExternalLink, Check, AlertCircle, Sparkles, CalendarClock, Bell, CheckCircle2, Ban } from 'lucide-react';
 import {
   buildWhatsAppMessage,
@@ -41,6 +41,37 @@ export function WhatsAppModal({
       setTemplateType(initialTemplate);
     }
   }, [isOpen, initialTemplate]);
+
+  // Filtrar plantillas según el estado de la cita para ocultar las que no correspondan
+  const availableTemplates = useMemo(() => {
+    if (booking?.status === 'COMPLETED') {
+      return [
+        { id: 'completed' as const, label: 'Agradecimiento', icon: Sparkles, color: 'text-pretty-pink-400' },
+        { id: 'reminder' as const, label: 'Seguimiento / Cuidados', icon: Bell, color: 'text-amber-500' }
+      ];
+    }
+    if (booking?.status === 'CANCELLED' || booking?.status === 'REJECTED') {
+      return [
+        { id: 'cancellation' as const, label: 'Cancelación', icon: Ban, color: 'text-rose-500' }
+      ];
+    }
+    return [
+      { id: 'confirmation' as const, label: 'Confirmación', icon: CheckCircle2, color: 'text-emerald-500' },
+      { id: 'reschedule' as const, label: 'Fecha/Hora', icon: CalendarClock, color: 'text-pretty-pink-400' },
+      { id: 'reminder' as const, label: 'Recordatorio', icon: Bell, color: 'text-amber-500' },
+      { id: 'cancellation' as const, label: 'Cancelación', icon: Ban, color: 'text-rose-500' }
+    ];
+  }, [booking?.status]);
+
+  // Si la plantilla seleccionada no está en las plantillas disponibles para este estado, resetear
+  useEffect(() => {
+    if (isOpen && availableTemplates.length > 0) {
+      const isValid = availableTemplates.some((t) => t.id === templateType);
+      if (!isValid) {
+        setTemplateType(availableTemplates[0].id);
+      }
+    }
+  }, [isOpen, availableTemplates, templateType]);
 
   useEffect(() => {
     if (booking) {
@@ -184,67 +215,37 @@ export function WhatsAppModal({
           <label className="block text-xs font-semibold text-pretty-wine-900 mb-1.5">
             Plantilla de mensaje:
           </label>
-          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-1.5 p-1 rounded-2xl bg-pretty-pink-100/70 border border-pretty-pink-200/60">
-            <button
-              type="button"
-              onClick={() => setTemplateType('confirmation')}
-              className={`flex items-center justify-center space-x-1 py-1.5 px-2 rounded-xl text-xs font-bold transition-all ${
-                templateType === 'confirmation'
-                  ? 'bg-pretty-wine-900 text-white shadow-sm'
-                  : 'text-pretty-wine-900 hover:bg-white/60'
-              }`}
-            >
-              <CheckCircle2 className="w-3 h-3" />
-              <span>Confirmación</span>
-            </button>
-            <button
-              type="button"
-              onClick={() => setTemplateType('reschedule')}
-              className={`flex items-center justify-center space-x-1 py-1.5 px-2 rounded-xl text-xs font-bold transition-all ${
-                templateType === 'reschedule'
-                  ? 'bg-pretty-wine-900 text-white shadow-sm'
-                  : 'text-pretty-wine-900 hover:bg-white/60'
-              }`}
-            >
-              <CalendarClock className="w-3 h-3 text-pretty-pink-400" />
-              <span>Fecha/Hora</span>
-            </button>
-            <button
-              type="button"
-              onClick={() => setTemplateType('reminder')}
-              className={`flex items-center justify-center space-x-1 py-1.5 px-2 rounded-xl text-xs font-bold transition-all ${
-                templateType === 'reminder'
-                  ? 'bg-pretty-wine-900 text-white shadow-sm'
-                  : 'text-pretty-wine-900 hover:bg-white/60'
-              }`}
-            >
-              <Bell className="w-3 h-3 text-amber-500" />
-              <span>Recordatorio</span>
-            </button>
-            <button
-              type="button"
-              onClick={() => setTemplateType('completed')}
-              className={`flex items-center justify-center space-x-1 py-1.5 px-2 rounded-xl text-xs font-bold transition-all ${
-                templateType === 'completed'
-                  ? 'bg-pretty-wine-900 text-white shadow-sm'
-                  : 'text-pretty-wine-900 hover:bg-white/60'
-              }`}
-            >
-              <Sparkles className="w-3 h-3 text-pretty-pink-400" />
-              <span>Agradecimiento</span>
-            </button>
-            <button
-              type="button"
-              onClick={() => setTemplateType('cancellation')}
-              className={`flex items-center justify-center space-x-1 py-1.5 px-2 rounded-xl text-xs font-bold transition-all col-span-2 sm:col-span-1 ${
-                templateType === 'cancellation'
-                  ? 'bg-rose-700 text-white shadow-sm'
-                  : 'text-pretty-wine-900 hover:bg-white/60'
-              }`}
-            >
-              <Ban className="w-3 h-3 text-rose-500" />
-              <span>Cancelación</span>
-            </button>
+          <div
+            className={`grid gap-1.5 p-1 rounded-2xl bg-pretty-pink-100/70 border border-pretty-pink-200/60 ${
+              availableTemplates.length === 1
+                ? 'grid-cols-1'
+                : availableTemplates.length === 2
+                ? 'grid-cols-2'
+                : 'grid-cols-2 sm:grid-cols-4'
+            }`}
+          >
+            {availableTemplates.map((tpl) => {
+              const IconComp = tpl.icon;
+              const isSelected = templateType === tpl.id;
+              const isCancel = tpl.id === 'cancellation';
+              return (
+                <button
+                  key={tpl.id}
+                  type="button"
+                  onClick={() => setTemplateType(tpl.id)}
+                  className={`flex items-center justify-center space-x-1 py-1.5 px-2 rounded-xl text-xs font-bold transition-all ${
+                    isSelected
+                      ? isCancel
+                        ? 'bg-rose-700 text-white shadow-sm'
+                        : 'bg-pretty-wine-900 text-white shadow-sm'
+                      : 'text-pretty-wine-900 hover:bg-white/60'
+                  }`}
+                >
+                  <IconComp className={`w-3 h-3 ${isSelected ? 'text-white' : tpl.color}`} />
+                  <span>{tpl.label}</span>
+                </button>
+              );
+            })}
           </div>
         </div>
 

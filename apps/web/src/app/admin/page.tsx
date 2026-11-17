@@ -62,6 +62,7 @@ import { AdminLocationsModal } from '../../components/AdminLocationsModal';
 import { PushNotificationModal } from '../../components/PushNotificationModal';
 import { AdminMenuDrawer } from '../../components/AdminMenuDrawer';
 import { StylistDropdown } from '../../components/StylistDropdown';
+import { BookingActionMenu } from '../../components/BookingActionMenu';
 
 export default function AdminDashboardPage() {
   const router = useRouter();
@@ -763,73 +764,26 @@ export default function AdminDashboardPage() {
                           </button>
                         </div>
 
-                        {/* Botones de Cambiar Fecha y Hora / WhatsApp / Rechazar / Confirmar */}
-                        <div className="flex flex-wrap items-center gap-1.5">
-                          <button
-                            type="button"
-                            onClick={() => {
-                              setSelectedBookingForReschedule(b);
+                        {/* Acciones contextuales encapsuladas en Dropdown */}
+                        <div className="flex items-center justify-end">
+                          <BookingActionMenu
+                            booking={b}
+                            onAssign={(booking) => {
+                              setSelectedBookingForAssign(booking);
+                              setIsAssignOpen(true);
+                            }}
+                            onReschedule={(booking) => {
+                              setSelectedBookingForReschedule(booking);
                               setIsRescheduleOpen(true);
                             }}
-                            className="inline-flex items-center space-x-1 px-2.5 py-1.5 rounded-full text-xs font-semibold bg-white hover:bg-pretty-pink-50 text-pretty-wine-900 border border-pretty-pink-200 shadow-sm transition-all"
-                            title="Cambiar fecha y hora de la cita de forma interactiva"
-                          >
-                            <CalendarClock className="w-3.5 h-3.5 text-pretty-pink-500" />
-                            <span>Cambiar fecha y hora</span>
-                          </button>
-
-                          <button
-                            type="button"
-                            onClick={() => {
-                              setSelectedBookingForWa(b);
-                              setWaInitialTemplate('confirmation');
+                            onWhatsApp={(booking, template) => {
+                              setSelectedBookingForWa(booking);
+                              setWaInitialTemplate(template || 'confirmation');
                               setPreviousScheduleForWa(undefined);
                               setIsWaOpen(true);
                             }}
-                            className="inline-flex items-center space-x-1 px-2.5 py-1.5 rounded-full text-xs font-semibold bg-white hover:bg-pretty-pink-50 text-pretty-wine-900 border border-pretty-pink-200 shadow-sm"
-                          >
-                            <MessageSquare className="w-3.5 h-3.5 text-emerald-600" />
-                            <span>WhatsApp</span>
-                          </button>
-
-                          <button
-                            type="button"
-                            onClick={() => {
-                              if (window.confirm(`¿Deseas rechazar la solicitud de cita #${b.referenceCode}? Se abrirá WhatsApp para notificar a la clienta.`)) {
-                                handleStatusChange(b.id, 'REJECTED');
-                              }
-                            }}
-                            className="inline-flex items-center space-x-1 px-2.5 py-1.5 rounded-full text-xs font-semibold text-rose-700 hover:bg-rose-50 border border-rose-200 transition-all"
-                          >
-                            <XCircle className="w-3.5 h-3.5" />
-                            <span>Rechazar</span>
-                          </button>
-
-                          <button
-                            disabled={isUnassigned}
-                            onClick={() => {
-                              if (isUnassigned) {
-                                setActionError('Debes asignar una esteticista antes de poder confirmar la cita.');
-                                return;
-                              }
-                              handleStatusChange(b.id, 'CONFIRMED');
-                            }}
-                            title={isUnassigned ? 'Asigna primero una esteticista para habilitar la confirmación' : 'Confirmar Cita'}
-                            className={`inline-flex items-center space-x-1.5 px-3.5 py-1.5 rounded-full text-xs font-bold transition-all shadow-sm ${
-                              isUnassigned
-                                ? 'bg-gray-100 text-gray-400 border border-gray-200 cursor-not-allowed opacity-75'
-                                : 'text-white bg-pretty-wine-900 hover:bg-pretty-pink-600 active:scale-95'
-                            }`}
-                          >
-                            <CheckCircle2 className="w-3.5 h-3.5" />
-                            <span>
-                              {isUnassigned
-                                ? 'Requiere Asignar'
-                                : currentUser?.professional?.id === assignedProfId
-                                ? 'Aceptar y Confirmar Cita'
-                                : 'Confirmar Cita'}
-                            </span>
-                          </button>
+                            onStatusChange={handleStatusChange}
+                          />
                         </div>
                       </div>
 
@@ -1121,81 +1075,26 @@ export default function AdminDashboardPage() {
                               </div>
                             </div>
 
-                            {/* Acciones */}
-                            <div className="pt-2 flex flex-wrap items-center justify-end gap-1.5 border-t border-pretty-pink-100">
-                              {b.status !== 'COMPLETED' && b.status !== 'CANCELLED' && b.status !== 'REJECTED' && (
-                                <button
-                                  type="button"
-                                  onClick={() => {
-                                    setSelectedBookingForReschedule(b);
-                                    setIsRescheduleOpen(true);
-                                  }}
-                                  className="inline-flex items-center space-x-1 px-2.5 py-1 rounded-full text-xs font-semibold bg-white hover:bg-pretty-pink-50 text-pretty-wine-900 border border-pretty-pink-200 transition-all"
-                                  title="Cambiar fecha u hora de la cita"
-                                >
-                                  <CalendarClock className="w-3 h-3 text-pretty-pink-500" />
-                                  <span>Cambiar fecha y hora</span>
-                                </button>
-                              )}
-
-                              <button
-                                type="button"
-                                onClick={() => {
-                                  setSelectedBookingForWa(b);
-                                  setWaInitialTemplate(
-                                    b.status === 'COMPLETED'
-                                      ? 'completed'
-                                      : b.status === 'CANCELLED' || b.status === 'REJECTED'
-                                      ? 'cancellation'
-                                      : 'confirmation'
-                                  );
+                            {/* Acciones contextuales encapsuladas en Dropdown */}
+                            <div className="pt-2 flex items-center justify-end border-t border-pretty-pink-100">
+                              <BookingActionMenu
+                                booking={b}
+                                onAssign={(booking) => {
+                                  setSelectedBookingForAssign(booking);
+                                  setIsAssignOpen(true);
+                                }}
+                                onReschedule={(booking) => {
+                                  setSelectedBookingForReschedule(booking);
+                                  setIsRescheduleOpen(true);
+                                }}
+                                onWhatsApp={(booking, template) => {
+                                  setSelectedBookingForWa(booking);
+                                  setWaInitialTemplate(template || (b.status === 'COMPLETED' ? 'completed' : 'confirmation'));
                                   setPreviousScheduleForWa(undefined);
                                   setIsWaOpen(true);
                                 }}
-                                className={`inline-flex items-center space-x-1 px-2.5 py-1 rounded-full text-xs font-semibold border transition-all ${
-                                  b.status === 'COMPLETED'
-                                    ? 'bg-pretty-pink-100/80 hover:bg-pretty-pink-200 text-pretty-wine-900 border-pretty-pink-300'
-                                    : 'bg-white hover:bg-pretty-pink-50 text-pretty-wine-900 border-pretty-pink-200'
-                                }`}
-                                title={b.status === 'COMPLETED' ? 'Enviar mensaje de agradecimiento por WhatsApp' : 'Abrir WhatsApp'}
-                              >
-                                {b.status === 'COMPLETED' ? (
-                                  <>
-                                    <Sparkles className="w-3 h-3 text-pretty-pink-600" />
-                                    <span>Agradecimiento</span>
-                                  </>
-                                ) : (
-                                  <>
-                                    <MessageSquare className="w-3 h-3 text-emerald-600" />
-                                    <span>WhatsApp</span>
-                                  </>
-                                )}
-                              </button>
-
-                              {b.status === 'CONFIRMED' && (
-                                <>
-                                  <button
-                                    onClick={() => handleStatusChange(b.id, 'COMPLETED')}
-                                    className="inline-flex items-center space-x-1 px-2.5 py-1 rounded-full text-xs font-semibold text-pretty-wine-900 bg-pretty-pink-100 hover:bg-pretty-pink-200"
-                                  >
-                                    <Sparkles className="w-3 h-3" />
-                                    <span>Completar</span>
-                                  </button>
-
-                                  <button
-                                    type="button"
-                                    onClick={() => {
-                                      if (window.confirm(`¿Estás segura de cancelar la cita #${b.referenceCode}? Se abrirá WhatsApp con el mensaje de cancelación listo para la clienta.`)) {
-                                        handleStatusChange(b.id, 'CANCELLED');
-                                      }
-                                    }}
-                                    className="inline-flex items-center space-x-1 px-2.5 py-1 rounded-full text-xs font-semibold text-rose-700 bg-rose-50 hover:bg-rose-100 border border-rose-200 transition-all"
-                                  >
-                                    <Ban className="w-3 h-3 text-rose-600" />
-                                    <span>Cancelar</span>
-                                  </button>
-                                </>
-                              )}
+                                onStatusChange={handleStatusChange}
+                              />
                             </div>
                           </div>
                         );
@@ -1383,81 +1282,26 @@ export default function AdminDashboardPage() {
                           </div>
                         </div>
 
-                        {/* Acciones */}
-                        <div className="pt-2 flex flex-wrap items-center justify-end gap-1.5 border-t border-pretty-pink-100">
-                          {b.status !== 'COMPLETED' && b.status !== 'CANCELLED' && b.status !== 'REJECTED' && (
-                            <button
-                              type="button"
-                              onClick={() => {
-                                setSelectedBookingForReschedule(b);
-                                setIsRescheduleOpen(true);
-                              }}
-                              className="inline-flex items-center space-x-1 px-2.5 py-1 rounded-full text-xs font-semibold bg-white hover:bg-pretty-pink-50 text-pretty-wine-900 border border-pretty-pink-200 transition-all"
-                              title="Cambiar fecha u hora de la cita"
-                            >
-                              <CalendarClock className="w-3 h-3 text-pretty-pink-500" />
-                              <span>Cambiar fecha y hora</span>
-                            </button>
-                          )}
-
-                          <button
-                            type="button"
-                            onClick={() => {
-                              setSelectedBookingForWa(b);
-                              setWaInitialTemplate(
-                                b.status === 'COMPLETED'
-                                  ? 'completed'
-                                  : b.status === 'CANCELLED' || b.status === 'REJECTED'
-                                  ? 'cancellation'
-                                  : 'confirmation'
-                              );
+                        {/* Acciones contextuales encapsuladas en Dropdown */}
+                        <div className="pt-2 flex items-center justify-end border-t border-pretty-pink-100">
+                          <BookingActionMenu
+                            booking={b}
+                            onAssign={(booking) => {
+                              setSelectedBookingForAssign(booking);
+                              setIsAssignOpen(true);
+                            }}
+                            onReschedule={(booking) => {
+                              setSelectedBookingForReschedule(booking);
+                              setIsRescheduleOpen(true);
+                            }}
+                            onWhatsApp={(booking, template) => {
+                              setSelectedBookingForWa(booking);
+                              setWaInitialTemplate(template || (b.status === 'COMPLETED' ? 'completed' : 'confirmation'));
                               setPreviousScheduleForWa(undefined);
                               setIsWaOpen(true);
                             }}
-                            className={`inline-flex items-center space-x-1 px-2.5 py-1 rounded-full text-xs font-semibold border transition-all ${
-                              b.status === 'COMPLETED'
-                                ? 'bg-pretty-pink-100/80 hover:bg-pretty-pink-200 text-pretty-wine-900 border-pretty-pink-300'
-                                : 'bg-white hover:bg-pretty-pink-50 text-pretty-wine-900 border-pretty-pink-200'
-                            }`}
-                            title={b.status === 'COMPLETED' ? 'Enviar mensaje de agradecimiento por WhatsApp' : 'Abrir WhatsApp'}
-                          >
-                            {b.status === 'COMPLETED' ? (
-                              <>
-                                <Sparkles className="w-3 h-3 text-pretty-pink-600" />
-                                <span>Agradecimiento</span>
-                              </>
-                            ) : (
-                              <>
-                                <MessageSquare className="w-3 h-3 text-emerald-600" />
-                                <span>WhatsApp</span>
-                              </>
-                            )}
-                          </button>
-
-                          {b.status === 'CONFIRMED' && (
-                            <>
-                              <button
-                                onClick={() => handleStatusChange(b.id, 'COMPLETED')}
-                                className="inline-flex items-center space-x-1 px-2.5 py-1 rounded-full text-xs font-semibold text-pretty-wine-900 bg-pretty-pink-100 hover:bg-pretty-pink-200"
-                              >
-                                <Sparkles className="w-3 h-3" />
-                                <span>Completar</span>
-                              </button>
-
-                               <button
-                                type="button"
-                                onClick={() => {
-                                  if (window.confirm(`¿Estás segura de cancelar la cita #${b.referenceCode}? Se abrirá WhatsApp con el mensaje de cancelación listo para la clienta.`)) {
-                                    handleStatusChange(b.id, 'CANCELLED');
-                                  }
-                                }}
-                                className="inline-flex items-center space-x-1 px-2.5 py-1 rounded-full text-xs font-semibold text-rose-700 bg-rose-50 hover:bg-rose-100 border border-rose-200 transition-all"
-                              >
-                                <Ban className="w-3 h-3 text-rose-600" />
-                                <span>Cancelar</span>
-                              </button>
-                            </>
-                          )}
+                            onStatusChange={handleStatusChange}
+                          />
                         </div>
                       </div>
                     ))
